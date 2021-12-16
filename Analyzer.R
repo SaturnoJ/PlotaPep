@@ -146,10 +146,16 @@ quant <- function(proteins, x) {
   }
 }
 
+top_n <- function(df,x){
+  df<-df[order(-df$Freq),]
+  if(missing(x)){
+  return(df <-head(df, - (nrow(df)-100)))
+}else{
+  return(df <-head(df, - (nrow(df)-x)))
+  
+}
+}
 
-setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
-path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
-file.names <- list.files(path, pattern = ".csv")
 
 library("tidyverse")
 library("org.Hs.eg.db")
@@ -159,6 +165,10 @@ library("Biostrings")
 library("dplyr")
 ptm <- proc.time()
 
+# setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
+# path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
+# file.names <- list.files(path, pattern = ".csv")
+#
 # file <-
 #   read_delim(
 #     file.names[1],
@@ -169,7 +179,7 @@ ptm <- proc.time()
 #   )
 # file$file <- file.names[1]
 # df <- file
-#
+# 
 # for (i in 2:length(file.names)) {
 #   file <-
 #     read_delim(
@@ -188,13 +198,16 @@ df <- remove_false(df)
 ctr <- split_ctr(df)
 ad <- split_ad(df, ctr)
 
-ctr_top <- as.data.frame(table(ctr$Accession))
-ctr_top$Cohort <- c("AD")
-ad_top <- as.data.frame(table(ad$Accession))
-ad_top$Cohort <- c("CTR")
+ad <- as.data.frame(table(ad$Accession))
+ad$Cohort <- c("AD")
+ctr <- as.data.frame(table(ctr$Accession))
+ctr$Cohort <- c("CTR")
 
-percentile_ctr <- quant(ctr_top)
-percentile_ad <- quant(ad_top)
+percentile_ctr <- quant(ctr)
+percentile_ad <- quant(ad)
+
+ctr_top <- top_n(ctr)
+ad_top <- top_n(ad)
 
 fasta <- as.data.frame(readAAStringSet("protiens.fasta"))
 
