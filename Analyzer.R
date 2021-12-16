@@ -146,14 +146,14 @@ quant <- function(proteins, x) {
   }
 }
 
-top_n <- function(df,x){
-  df<-df[order(-df$Freq),]
-  if(missing(x)){
-  return(df <-head(df, - (nrow(df)-100)))
-}else{
-  return(df <-head(df, - (nrow(df)-x)))
-  
-}
+top_n <- function(df, x) {
+  df <- df[order(-df$Freq),]
+  if (missing(x)) {
+    return(df <- head(df, -(nrow(df) - 100)))
+  } else{
+    return(df <- head(df, -(nrow(df) - x)))
+    
+  }
 }
 
 
@@ -179,7 +179,7 @@ ptm <- proc.time()
 #   )
 # file$file <- file.names[1]
 # df <- file
-# 
+#
 # for (i in 2:length(file.names)) {
 #   file <-
 #     read_delim(
