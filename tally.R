@@ -121,23 +121,15 @@ add_symbols <- function(filtered, symbols) {
 }
 
 locate <- function(cleavage_x, fasta) {
-  start <- NULL 
-  end <- NULL
-  locate <- data.frame(start, end)
+  
   
   for (i in 1:nrow(fasta)) {
     for(j in 1:nrow(cleavage_x)){
     if (grepl(cleavage_x$protein[j], fasta$accession[i])) {
-      print(i)
-      print(j)
-      protein <- as.character(fasta$seq[i])
-      print(protein)
-      print(cleavage_x$Var1[j])
       locate <-
-        as.data.frame(str_locate(protein, cleavage_x$Var1[j]))
-      print(locate)
-      cleavage_x$start_seq[i] <- locate$start
-      cleavage_x$end_seq[i] <- locate$end
+        as.data.frame(str_locate(fasta$seq[i], cleavage_x$Var1[j]))
+      cleavage_x$start_seq[j] <- locate$start
+      cleavage_x$end_seq[j] <- locate$end
     }
   }
 }
@@ -157,32 +149,32 @@ library("Biostrings")
 
 ptm <- proc.time()
 
-file <-
-  read_delim(
-    file.names[1],
-    delim = "\t",
-    escape_double = FALSE,
-    trim_ws = TRUE,
-    show_col_types = FALSE
-  )
-file$file <- file.names[1]
-df <- file
+# file <-
+#   read_delim(
+#     file.names[1],
+#     delim = "\t",
+#     escape_double = FALSE,
+#     trim_ws = TRUE,
+#     show_col_types = FALSE
+#   )
+# file$file <- file.names[1]
+# df <- file
+# 
+# for (i in 2:length(file.names)) {
+#   file <-
+#     read_delim(
+#       file.names[i],
+#       delim = "\t",
+#       escape_double = FALSE,
+#       trim_ws = TRUE,
+#       show_col_types = FALSE
+#     )
+#   file$file <- file.names[i]
+#   df <- rbind(df, file)
+# }
 
-for (i in 2:length(file.names)) {
-  file <-
-    read_delim(
-      file.names[i],
-      delim = "\t",
-      escape_double = FALSE,
-      trim_ws = TRUE,
-      show_col_types = FALSE
-    )
-  file$file <- file.names[i]
-  df <- rbind(df, file)
-}
 
-
-fasta <- as.data.frame(readDNAStringSet("protiens.fasta"))
+fasta <- as.data.frame(readAAStringSet("protiens.fasta"))
 
 fasta <- tibble::rownames_to_column(fasta, "accession")
 colnames(fasta) <- c("accession", "seq")
@@ -253,43 +245,43 @@ cleavage_x <- load_semi(cleavage_x, semi_tryp)
 
 cleavage_x <- load_protein(cleavage_x, semi_tryp)
 
-# cleavage_x <- locate(cleavage_x, fasta)
+cleavage_x <- locate(cleavage_x, fasta)
 start <- NULL 
 end <- NULL
-locate <- data.frame(start, end)
-
-for (i in 1:nrow(cleavage_x)) {
-  if (cleavage_x$protein[i] == "APOE") {
-    locate <- as.data.frame(str_locate(apoe, cleavage_x$Var1[i]))
-
-    cleavage_x$start_seq[i] <- locate$start
-    cleavage_x$end_seq[i] <- locate$end
-  }
-  else if (cleavage_x$protein[i] == "CLU") {
-    locate <- as.data.frame(str_locate(clu, cleavage_x$Var1[i]))
-
-    cleavage_x$start_seq[i] <- locate$start
-    cleavage_x$end_seq[i] <- locate$end
-  }
-  else if (cleavage_x$protein[i] == "MAPT") {
-    locate <- as.data.frame(str_locate(mapt, cleavage_x$Var1[i]))
-
-    cleavage_x$start_seq[i] <- locate$start
-    cleavage_x$end_seq[i] <- locate$end
-  }
-  else if (cleavage_x$protein[i] == "PRNP") {
-    locate <- as.data.frame(str_locate(prnp, cleavage_x$Var1[i]))
-
-    cleavage_x$start_seq[i] <- locate$start
-    cleavage_x$end_seq[i] <- locate$end
-  }
-  else if (cleavage_x$protein[i] == "APP") {
-    locate <- as.data.frame(str_locate(app, cleavage_x$Var1[i]))
-
-    cleavage_x$start_seq[i] <- locate$start
-    cleavage_x$end_seq[i] <- locate$end
-  }
-}
+# locate <- data.frame(start, end)
+# 
+# for (i in 1:nrow(cleavage_x)) {
+#   if (cleavage_x$protein[i] == "APOE") {
+#     locate <- as.data.frame(str_locate(apoe, cleavage_x$Var1[i]))
+# 
+#     cleavage_x$start_seq[i] <- locate$start
+#     cleavage_x$end_seq[i] <- locate$end
+#   }
+#   else if (cleavage_x$protein[i] == "CLU") {
+#     locate <- as.data.frame(str_locate(clu, cleavage_x$Var1[i]))
+# 
+#     cleavage_x$start_seq[i] <- locate$start
+#     cleavage_x$end_seq[i] <- locate$end
+#   }
+#   else if (cleavage_x$protein[i] == "MAPT") {
+#     locate <- as.data.frame(str_locate(mapt, cleavage_x$Var1[i]))
+# 
+#     cleavage_x$start_seq[i] <- locate$start
+#     cleavage_x$end_seq[i] <- locate$end
+#   }
+#   else if (cleavage_x$protein[i] == "PRNP") {
+#     locate <- as.data.frame(str_locate(prnp, cleavage_x$Var1[i]))
+# 
+#     cleavage_x$start_seq[i] <- locate$start
+#     cleavage_x$end_seq[i] <- locate$end
+#   }
+#   else if (cleavage_x$protein[i] == "APP") {
+#     locate <- as.data.frame(str_locate(app, cleavage_x$Var1[i]))
+# 
+#     cleavage_x$start_seq[i] <- locate$start
+#     cleavage_x$end_seq[i] <- locate$end
+#   }
+# }
 
 cleavage_x <- cut_at(cleavage_x)
 
