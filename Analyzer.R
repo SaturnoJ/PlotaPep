@@ -137,6 +137,13 @@ locate <- function(cleavage_x, fasta) {
   
 }
 
+remove_false <- function(df){
+  
+  return(subset(df,!grepl("XXX",df$Accession)))
+  
+  
+}
+
 setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
 file.names <- list.files(path, pattern = ".csv")
@@ -149,30 +156,39 @@ library("Biostrings")
 
 ptm <- proc.time()
 
-# file <-
-#   read_delim(
-#     file.names[1],
-#     delim = "\t",
-#     escape_double = FALSE,
-#     trim_ws = TRUE,
-#     show_col_types = FALSE
-#   )
-# file$file <- file.names[1]
-# df <- file
-# 
-# for (i in 2:length(file.names)) {
-#   file <-
-#     read_delim(
-#       file.names[i],
-#       delim = "\t",
-#       escape_double = FALSE,
-#       trim_ws = TRUE,
-#       show_col_types = FALSE
-#     )
-#   file$file <- file.names[i]
-#   df <- rbind(df, file)
-# }
+file <-
+  read_delim(
+    file.names[1],
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE,
+    show_col_types = FALSE
+  )
+file$file <- file.names[1]
+df <- file
 
+for (i in 2:length(file.names)) {
+  file <-
+    read_delim(
+      file.names[i],
+      delim = "\t",
+      escape_double = FALSE,
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    )
+  file$file <- file.names[i]
+  df <- rbind(df, file)
+}
+
+df<- remove_false(df)
+
+ctr <- split_ctr(df)
+ad <- split_ad(df, ctr)
+
+ctr_top<- as.data.frame(table(ctr$Accession))
+ctr_top$Cohort <- c("AD")
+ad_top<- as.data.frame(table(ad$Accession))
+ad_top$Cohort <- c("CTR")
 
 fasta <- as.data.frame(readAAStringSet("protiens.fasta"))
 
@@ -180,7 +196,6 @@ fasta <- tibble::rownames_to_column(fasta, "accession")
 colnames(fasta) <- c("accession", "seq")
 
 uniprot <- c("P05067", "P02649", "P10636", "P10909", "P04156")
-
 
 symbols <- select(org.Hs.eg.db, uniprot, "SYMBOL", "UNIPROT")
 
