@@ -97,13 +97,13 @@ cut_at <- function(cleavage_x) {
 #Filters out proteins above cutoff and not being searched for
 filterer <- function(df, cutoff, symbols) {
   filtered <- filter(df, cutoff > df$Expect)
-  x<-NULL
-  for(i in 1:nrow(symbols)){
-  y <- filter(filtered,
-                     grepl(symbols$UNIPROT[i],filtered$Accession))
-  x <- rbind(x,y)
+  x <- NULL
+  for (i in 1:nrow(symbols)) {
+    y <- filter(filtered,
+                grepl(symbols$UNIPROT[i], filtered$Accession))
+    x <- rbind(x, y)
   }
-  filtered <-x
+  filtered <- x
   
   return(filtered)
 }
@@ -121,28 +121,31 @@ add_symbols <- function(filtered, symbols) {
 }
 
 locate <- function(cleavage_x, fasta) {
-  
-  
   for (i in 1:nrow(fasta)) {
-    for(j in 1:nrow(cleavage_x)){
-    if (grepl(cleavage_x$protein[j], fasta$accession[i])) {
-      locate <-
-        as.data.frame(str_locate(fasta$seq[i], cleavage_x$Var1[j]))
-      cleavage_x$start_seq[j] <- locate$start
-      cleavage_x$end_seq[j] <- locate$end
+    for (j in 1:nrow(cleavage_x)) {
+      if (grepl(cleavage_x$protein[j], fasta$accession[i])) {
+        locate <-
+          as.data.frame(str_locate(fasta$seq[i], cleavage_x$Var1[j]))
+        cleavage_x$start_seq[j] <- locate$start
+        cleavage_x$end_seq[j] <- locate$end
+      }
     }
   }
-}
   return(cleavage_x)
   
 }
 
-remove_false <- function(df){
-  
-  return(subset(df,!grepl("XXX",df$Accession)))
-  
-  
+remove_false <- function(df) {
+  return(subset(df,!grepl("XXX", df$Accession)))
 }
+quant <- function(proteins, x) {
+  if (missing(x)) {
+    return(subset(proteins, Freq > quantile(proteins$Freq, probs = 0.95)))
+  } else{
+    return(subset(proteins, Freq > quantile(proteins$Freq, probs = x)))
+  }
+}
+
 
 setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
@@ -153,42 +156,45 @@ library("org.Hs.eg.db")
 library("biomartr")
 library("magrittr")
 library("Biostrings")
-
+library("dplyr")
 ptm <- proc.time()
 
-file <-
-  read_delim(
-    file.names[1],
-    delim = "\t",
-    escape_double = FALSE,
-    trim_ws = TRUE,
-    show_col_types = FALSE
-  )
-file$file <- file.names[1]
-df <- file
+# file <-
+#   read_delim(
+#     file.names[1],
+#     delim = "\t",
+#     escape_double = FALSE,
+#     trim_ws = TRUE,
+#     show_col_types = FALSE
+#   )
+# file$file <- file.names[1]
+# df <- file
+#
+# for (i in 2:length(file.names)) {
+#   file <-
+#     read_delim(
+#       file.names[i],
+#       delim = "\t",
+#       escape_double = FALSE,
+#       trim_ws = TRUE,
+#       show_col_types = FALSE
+#     )
+#   file$file <- file.names[i]
+#   df <- rbind(df, file)
+# }
 
-for (i in 2:length(file.names)) {
-  file <-
-    read_delim(
-      file.names[i],
-      delim = "\t",
-      escape_double = FALSE,
-      trim_ws = TRUE,
-      show_col_types = FALSE
-    )
-  file$file <- file.names[i]
-  df <- rbind(df, file)
-}
-
-df<- remove_false(df)
+df <- remove_false(df)
 
 ctr <- split_ctr(df)
 ad <- split_ad(df, ctr)
 
-ctr_top<- as.data.frame(table(ctr$Accession))
+ctr_top <- as.data.frame(table(ctr$Accession))
 ctr_top$Cohort <- c("AD")
-ad_top<- as.data.frame(table(ad$Accession))
+ad_top <- as.data.frame(table(ad$Accession))
 ad_top$Cohort <- c("CTR")
+
+percentile_ctr <- quant(ctr_top)
+percentile_ad <- quant(ad_top)
 
 fasta <- as.data.frame(readAAStringSet("protiens.fasta"))
 
@@ -228,11 +234,17 @@ N_terminus <- vector("character", nrow(all_seq))
 end_seq <- vector("numeric", nrow(all_seq))
 C_terminus <- vector("character", nrow(all_seq))
 protein <- vector("character", nrow(all_seq))
-cleavage_loc <- vector("numeric",nrow(all_seq))
+cleavage_loc <- vector("numeric", nrow(all_seq))
 
 
 cleavage_x <-
-  data.frame(protein,all_seq,cleavage_loc, start_seq, end_seq, N_terminus, C_terminus)
+  data.frame(protein,
+             all_seq,
+             cleavage_loc,
+             start_seq,
+             end_seq,
+             N_terminus,
+             C_terminus)
 
 cleavage_x <- load_semi(cleavage_x, semi_tryp)
 
@@ -242,111 +254,7 @@ cleavage_x <- locate(cleavage_x, fasta)
 
 cleavage_x <- cut_at(cleavage_x)
 
-# mapt_com <- ggplot(cleavage_x[cleavage_x$protein == 'MAPT', ],
-#                    aes(
-#                      x = cleavage_loc,
-#                      y = Freq,
-#                      group_by = cleavage_loc,
-#                      fill = Cohort
-#                    )) + geom_col() + theme_minimal() + labs(x = "Cleavage Site", y = "Frequency", title = "MAPT Cleavage Tabulation: AD vs CTRL") +  geom_text(
-#                      data = subset(cleavage_x, Freq > 35 &
-#                                      cleavage_x$protein == "MAPT"),
-#                      aes(label = cleavage_loc),
-#                      vjust = -1.0,
-#                      hjust = -0.2,
-#                      check_overlap =  TRUE
-#                    ) + facet_wrap(vars(Cohort), nrow = 2,)
-# app_com <- ggplot(cleavage_x[cleavage_x$protein == 'APP', ],
-#                   aes(
-#                     x = cleavage_loc,
-#                     y = Freq,
-#                     group_by = cleavage_loc,
-#                     fill = Cohort
-#                   )) + geom_col(width = 0.10) + theme_minimal() + labs(x = "Cleavage Site", y = "Frequency", title = "APP Cleavage Tabulation: AD vs CTRL") + geom_text(
-#                     data = subset(cleavage_x, Freq > 5 &
-#                                     cleavage_x$protein == "APP"),
-#                     aes(label = cleavage_loc),
-#                     vjust = -1.0,
-#                     hjust = -0.2,
-#                     check_overlap =  TRUE
-#                   )  + facet_wrap(vars(Cohort), nrow = 2,)
-# 
-# apoe_com <- ggplot(cleavage_x[cleavage_x$protein == 'APOE', ],
-#                    aes(
-#                      x = cleavage_loc,
-#                      y = Freq,
-#                      group_by = cleavage_loc,
-#                      fill = Cohort
-#                    )) + geom_col() + theme_minimal() + labs(x = "Cleavage Site", y = "Frequency", title = "APOE Cleavage Tabulation: AD vs CTRL") + geom_text(
-#                      data = subset(cleavage_x, Freq > 5 &
-#                                      cleavage_x$protein == "APOE"),
-#                      aes(label = cleavage_loc),
-#                      vjust = -1.0,
-#                      hjust = -0.2,
-#                      check_overlap =  TRUE
-#                    ) + facet_wrap(vars(Cohort), nrow = 2,)
-# prnp_com <- ggplot(cleavage_x[cleavage_x$protein == 'PRNP', ],
-#                    aes(
-#                      x = cleavage_loc,
-#                      y = Freq,
-#                      group_by = cleavage_loc,
-#                      fill = Cohort
-#                    )) + geom_col(width = 0.25) + theme_minimal() + labs(x = "Cleavage Site", y = "Frequency", title = "PRNP Cleavage Tabulation: AD vs CTRL") + geom_text(
-#                      data = subset(cleavage_x, Freq > 5 &
-#                                      cleavage_x$protein == "PRNP"),
-#                      aes(label = cleavage_loc),
-#                      vjust = -1.0,
-#                      hjust = -0.2,
-#                      check_overlap =  TRUE
-#                    ) + facet_wrap(vars(Cohort), nrow = 2,)
-# clu_com <- ggplot(cleavage_x[cleavage_x$protein == 'CLU', ],
-#                   aes(
-#                     x = cleavage_loc,
-#                     y = Freq,
-#                     group_by = cleavage_loc,
-#                     fill = Cohort
-#                   )) + geom_col() + theme_minimal() + labs(x = "Cleavage Site", y = "Frequency", title = "CLU Cleavage Tabulation: AD vs CTRL") + geom_text(
-#                     data = subset(cleavage_x, Freq > 5 &
-#                                     cleavage_x$protein == "CLU"),
-#                     aes(label = cleavage_loc),
-#                     vjust = -1.0,
-#                     hjust = -0.2,
-#                     check_overlap =  TRUE
-#                   ) + facet_wrap(vars(Cohort), nrow = 2,)
-# 
-# 
-# ggsave(
-#   file = "prnp_com.svg",
-#   plot = prnp_com,
-#   width = 10,
-#   height = 8
-# )
-# ggsave(
-#   file = "clu_com.svg",
-#   plot = clu_com,
-#   width = 10,
-#   height = 8
-# )
-# 
-# ggsave(
-#   file = "apoe_com.svg",
-#   plot = apoe_com,
-#   width = 10,
-#   height = 8
-# )
-# ggsave(
-#   file = "app_com.svg",
-#   plot = app_com,
-#   width = 10,
-#   height = 8
-# )
-# ggsave(
-#   file = "mapt_com.svg",
-#   plot = mapt_com,
-#   width = 10,
-#   height = 8
-# )
+
 
 proc.time() - ptm
 end
-
