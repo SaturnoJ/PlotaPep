@@ -165,33 +165,33 @@ library("Biostrings")
 library("dplyr")
 ptm <- proc.time()
 
-# setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
-# path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
-# file.names <- list.files(path, pattern = ".csv")
-#
-# file <-
-#   read_delim(
-#     file.names[1],
-#     delim = "\t",
-#     escape_double = FALSE,
-#     trim_ws = TRUE,
-#     show_col_types = FALSE
-#   )
-# file$file <- file.names[1]
-# df <- file
-#
-# for (i in 2:length(file.names)) {
-#   file <-
-#     read_delim(
-#       file.names[i],
-#       delim = "\t",
-#       escape_double = FALSE,
-#       trim_ws = TRUE,
-#       show_col_types = FALSE
-#     )
-#   file$file <- file.names[i]
-#   df <- rbind(df, file)
-# }
+setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
+path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
+file.names <- list.files(path, pattern = ".csv")
+
+file <-
+  read_delim(
+    file.names[1],
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE,
+    show_col_types = FALSE
+  )
+file$file <- file.names[1]
+df <- file
+
+for (i in 2:length(file.names)) {
+  file <-
+    read_delim(
+      file.names[i],
+      delim = "\t",
+      escape_double = FALSE,
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    )
+  file$file <- file.names[i]
+  df <- rbind(df, file)
+}
 
 df <- remove_false(df)
 
@@ -220,18 +220,18 @@ symbols <- select(org.Hs.eg.db, uniprot, "SYMBOL", "UNIPROT")
 
 
 
-filtered <- filterer(df, 0.1, symbols)
+df <- filterer(df, 0.1, symbols)
 
-symboled <- add_symbols(filtered, symbols)
+df <- add_symbols(df, symbols)
 
 
-symboled$N_terminus <- 'NULL'
-symboled$C_terminus <- 'NULL'
+df$N_terminus <- 'NULL'
+df$C_terminus <- 'NULL'
 
-removed <- remove_tryp(symboled)
-semi_tryp <- find_semi(removed)
-ctr <- split_ctr(semi_tryp)
-ad <- split_ad(semi_tryp, ctr)
+df <- remove_tryp(df)
+df <- find_semi(df)
+ctr <- split_ctr(df)
+ad <- split_ad(df, ctr)
 
 
 ad_seq <- as.data.frame(table(ad$Sequence))
@@ -259,9 +259,9 @@ cleavage_x <-
              N_terminus,
              C_terminus)
 
-cleavage_x <- load_semi(cleavage_x, semi_tryp)
+cleavage_x <- load_semi(cleavage_x, df)
 
-cleavage_x <- load_protein(cleavage_x, semi_tryp)
+cleavage_x <- load_protein(cleavage_x, df)
 
 cleavage_x <- locate(cleavage_x, fasta)
 
