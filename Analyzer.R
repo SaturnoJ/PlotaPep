@@ -48,51 +48,51 @@ split_ad <- function(df, ctr) {
   
 }
 #Loads already found semi-trypic values into aggregated dataset.
-load_semi <- function(cleavage_x, df) {
-  for (i in 1:nrow(cleavage_x)) {
+load_semi <- function(cleavages, df) {
+  for (i in 1:nrow(cleavages)) {
     for (j in 1:nrow(df)) {
-      if (cleavage_x$Var1[i] == df$Sequence[j]) {
-        cleavage_x$N_terminus[i] <- df$N_terminus[j]
-        cleavage_x$C_terminus[i] <- df$C_terminus[j]
+      if (cleavages$Var1[i] == df$Sequence[j]) {
+        cleavages$N_terminus[i] <- df$N_terminus[j]
+        cleavages$C_terminus[i] <- df$C_terminus[j]
         break
       }
       
     }
     
   }
-  return(cleavage_x)
+  return(cleavages)
 }
 #Loads protein symbols into aggregate dataset
-load_protein <- function(cleavage_x, df) {
+load_protein <- function(cleavages, df) {
   for (i in 1:nrow(df)) {
-    for (j in 1:nrow(cleavage_x)) {
-      if (df$Sequence[i] == cleavage_x$Var1[j] &&
-          !is.null(cleavage_x$protein[j])) {
-        cleavage_x$protein[j] <- df$Accession[i]
+    for (j in 1:nrow(cleavages)) {
+      if (df$Sequence[i] == cleavages$Var1[j] &&
+          !is.null(cleavages$protein[j])) {
+        cleavages$protein[j] <- df$Accession[i]
         
       }
       
     }
     
   }
-  return(cleavage_x)
+  return(cleavages)
   
 }
 #Loads where missed cleavage location occurred into aggregate dataset
-cut_at <- function(cleavage_x) {
-  for (i in 1:nrow(cleavage_x)) {
-    if (cleavage_x$N_terminus[i] == 'False') {
-      cleavage_x$cleavage_loc[i] <- cleavage_x$start_seq[i]
+cut_at <- function(cleavages) {
+  for (i in 1:nrow(cleavages)) {
+    if (cleavages$N_terminus[i] == 'False') {
+      cleavages$cleavage_loc[i] <- cleavages$start_seq[i]
       
     }
     
-    else if (cleavage_x$C_terminus[i] == 'False')
+    else if (cleavages$C_terminus[i] == 'False')
       
-      cleavage_x$cleavage_loc[i] <- cleavage_x$end_seq[i]
+      cleavages$cleavage_loc[i] <- cleavages$end_seq[i]
     
   }
   
-  return(cleavage_x)
+  return(cleavages)
 }
 #Filters out proteins above cutoff and not being searched for
 filterer <- function(df, cutoff, symbols) {
@@ -120,18 +120,18 @@ add_symbols <- function(df, symbols) {
   return(df)
 }
 
-locate <- function(cleavage_x, fasta) {
+locate <- function(cleavages, fasta) {
   for (i in 1:nrow(fasta)) {
-    for (j in 1:nrow(cleavage_x)) {
-      if (grepl(cleavage_x$protein[j], fasta$accession[i])) {
+    for (j in 1:nrow(cleavages)) {
+      if (grepl(cleavages$protein[j], fasta$accession[i])) {
         locate <-
-          as.data.frame(str_locate(fasta$seq[i], cleavage_x$Var1[j]))
-        cleavage_x$start_seq[j] <- locate$start
-        cleavage_x$end_seq[j] <- locate$end
+          as.data.frame(str_locate(fasta$seq[i], cleavages$Var1[j]))
+        cleavages$start_seq[j] <- locate$start
+        cleavages$end_seq[j] <- locate$end
       }
     }
   }
-  return(cleavage_x)
+  return(cleavages)
   
 }
 
@@ -169,35 +169,38 @@ setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
 file.names <- list.files(path, pattern = ".csv")
 
-file <-
-  read_delim(
-    file.names[1],
-    delim = "\t",
-    escape_double = FALSE,
-    trim_ws = TRUE,
-    show_col_types = FALSE
-  )
-file$file <- file.names[1]
-df <- file
+# file <-
+#   read_delim(
+#     file.names[1],
+#     delim = "\t",
+#     escape_double = FALSE,
+#     trim_ws = TRUE,
+#     show_col_types = FALSE
+#   )
+# file$file <- file.names[1]
+# df <- file
+# 
+# for (i in 2:length(file.names)) {
+#   file <-
+#     read_delim(
+#       file.names[i],
+#       delim = "\t",
+#       escape_double = FALSE,
+#       trim_ws = TRUE,
+#       show_col_types = FALSE
+#     )
+#   file$file <- file.names[i]
+#   df <- rbind(df, file)
+# }
+# 
+# 
+# 
+#used for testing
+# dr<- df
+df<- dr
 
-for (i in 2:length(file.names)) {
-  file <-
-    read_delim(
-      file.names[i],
-      delim = "\t",
-      escape_double = FALSE,
-      trim_ws = TRUE,
-      show_col_types = FALSE
-    )
-  file$file <- file.names[i]
-  df <- rbind(df, file)
-}
 
 df <- remove_false(df)
-
-
-dr<- df
-df<- dr
 
 ctr <- split_ctr(df)
 ad <- split_ad(df, ctr)
@@ -254,7 +257,7 @@ protein <- vector("character", nrow(all_seq))
 cleavage_loc <- vector("numeric", nrow(all_seq))
 
 
-cleavage_x <-
+cleavages <-
   data.frame(protein,
              all_seq,
              cleavage_loc,
@@ -263,13 +266,13 @@ cleavage_x <-
              N_terminus,
              C_terminus)
 
-cleavage_x <- load_semi(cleavage_x, df)
+cleavages <- load_semi(cleavages, df)
 
-cleavage_x <- load_protein(cleavage_x, df)
+cleavages <- load_protein(cleavages, df)
 
-cleavage_x <- locate(cleavage_x, fasta)
+cleavages <- locate(cleavages, fasta)
 
-cleavage_x <- cut_at(cleavage_x)
+cleavages <- cut_at(cleavages)
 
 
 
