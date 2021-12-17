@@ -1,59 +1,59 @@
 #Function removes trypic cleavages from full dataset by using the subset function and grepl for boolean values. Subset and grepl are funcitons of base R
-remove_tryp <- function(symboled) {
+remove_tryp <- function(df) {
   return(subset(
-    symboled,
+    df,
     (
-      !grepl('\\R$', symboled$Sequence) &
-        !grepl('\\K$', symboled$Sequence) #&
-      #symboled$`Peptide Next AA` != "P"
+      !grepl('\\R$', df$Sequence) &
+        !grepl('\\K$', df$Sequence) #&
+      #df$`Peptide Next AA` != "P"
     ) |
       (
-        symboled$`Peptide Previous AA`  != "R" &
-          symboled$`Peptide Previous AA` != "K"
+        df$`Peptide Previous AA`  != "R" &
+          df$`Peptide Previous AA` != "K"
       )
   ))
   
 }
 #Function finds semi-trypic cleavages in dataset by looping through comparing the amino acid before the sequence and ending amino acid in the sequence.
-find_semi <- function(filtered) {
-  for (i in 1:nrow(filtered)) {
-    if (filtered$`Peptide Previous AA`[i]  == "R" |
-        filtered$`Peptide Previous AA`[i] == "K") {
-      filtered$N_terminus[i] <- "True"
+find_semi <- function(df) {
+  for (i in 1:nrow(df)) {
+    if (df$`Peptide Previous AA`[i]  == "R" |
+        df$`Peptide Previous AA`[i] == "K") {
+      df$N_terminus[i] <- "True"
     } else {
-      filtered$N_terminus[i] <- "False"
+      df$N_terminus[i] <- "False"
     }
     
-    if ((grepl('\\R$', filtered$Sequence[i]) ||
-         grepl('\\K$', filtered$Sequence[i])))
+    if ((grepl('\\R$', df$Sequence[i]) ||
+         grepl('\\K$', df$Sequence[i])))
     {
-      filtered$C_terminus[i] <- "True"
+      df$C_terminus[i] <- "True"
     } else{
-      filtered$C_terminus[i] <- "False"
+      df$C_terminus[i] <- "False"
       
     }
     
     
   }
-  return(filtered)
+  return(df)
 }
 #Function removes the control cohort from the main dataset.
-split_ctr <- function(semi_tryp) {
-  return(subset(semi_tryp, grepl("CTR", semi_tryp$file)))
+split_ctr <- function(df) {
+  return(subset(df, grepl("CTR", df$file)))
   
 }
 #Uses the control file to intersect with main dataset to get Alzheimer's Dementia cohort from set.
-split_ad <- function(semi_tryp, ctr) {
-  return(subset(semi_tryp,!(semi_tryp$file %in% ctr$file)))
+split_ad <- function(df, ctr) {
+  return(subset(df,!(df$file %in% ctr$file)))
   
 }
 #Loads already found semi-trypic values into aggregated dataset.
-load_semi <- function(cleavage_x, semi_tryp) {
+load_semi <- function(cleavage_x, df) {
   for (i in 1:nrow(cleavage_x)) {
-    for (j in 1:nrow(semi_tryp)) {
-      if (cleavage_x$Var1[i] == semi_tryp$Sequence[j]) {
-        cleavage_x$N_terminus[i] <- semi_tryp$N_terminus[j]
-        cleavage_x$C_terminus[i] <- semi_tryp$C_terminus[j]
+    for (j in 1:nrow(df)) {
+      if (cleavage_x$Var1[i] == df$Sequence[j]) {
+        cleavage_x$N_terminus[i] <- df$N_terminus[j]
+        cleavage_x$C_terminus[i] <- df$C_terminus[j]
         break
       }
       
@@ -63,12 +63,12 @@ load_semi <- function(cleavage_x, semi_tryp) {
   return(cleavage_x)
 }
 #Loads protein symbols into aggregate dataset
-load_protein <- function(cleavage_x, semi_tryp) {
-  for (i in 1:nrow(semi_tryp)) {
+load_protein <- function(cleavage_x, df) {
+  for (i in 1:nrow(df)) {
     for (j in 1:nrow(cleavage_x)) {
-      if (semi_tryp$Sequence[i] == cleavage_x$Var1[j] &&
+      if (df$Sequence[i] == cleavage_x$Var1[j] &&
           !is.null(cleavage_x$protein[j])) {
-        cleavage_x$protein[j] <- semi_tryp$Accession[i]
+        cleavage_x$protein[j] <- df$Accession[i]
         
       }
       
@@ -96,28 +96,28 @@ cut_at <- function(cleavage_x) {
 }
 #Filters out proteins above cutoff and not being searched for
 filterer <- function(df, cutoff, symbols) {
-  filtered <- filter(df, cutoff > df$Expect)
+  df <- filter(df, cutoff > df$Expect)
   x <- NULL
   for (i in 1:nrow(symbols)) {
-    y <- filter(filtered,
-                grepl(symbols$UNIPROT[i], filtered$Accession))
+    y <- filter(df,
+                grepl(symbols$UNIPROT[i], df$Accession))
     x <- rbind(x, y)
   }
-  filtered <- x
+  df <- x
   
-  return(filtered)
+  return(df)
 }
 #Adds symbols to Accession column in dataframe
-add_symbols <- function(filtered, symbols) {
+add_symbols <- function(df, symbols) {
   for (i in 1:nrow(symbols)) {
-    for (j in 1:nrow(filtered)) {
-      if (grepl(symbols$UNIPROT[i], filtered$Accession[j])) {
-        filtered$Accession[j] <- symbols$SYMBOL[i]
+    for (j in 1:nrow(df)) {
+      if (grepl(symbols$UNIPROT[i], df$Accession[j])) {
+        df$Accession[j] <- symbols$SYMBOL[i]
         
       }
     }
   }
-  return(filtered)
+  return(df)
 }
 
 locate <- function(cleavage_x, fasta) {
@@ -194,6 +194,10 @@ for (i in 2:length(file.names)) {
 }
 
 df <- remove_false(df)
+
+
+dr<- df
+df<- dr
 
 ctr <- split_ctr(df)
 ad <- split_ad(df, ctr)
