@@ -124,10 +124,18 @@ locate <- function(cleavages, fasta) {
   for (i in 1:nrow(fasta)) {
     for (j in 1:nrow(cleavages)) {
       if (grepl(cleavages$protein[j], fasta$accession[i])) {
+        
         locate <-
           as.data.frame(str_locate(fasta$seq[i], cleavages$Var1[j]))
-        cleavages$start_seq[j] <- locate$start
-        cleavages$end_seq[j] <- locate$end
+        print(locate$start)
+        print(is.na(locate))
+        if(!is.na(locate)){
+          cleavages$start_seq[j] <- locate$start
+          cleavages$end_seq[j] <- locate$end
+        }
+        else{
+       
+        }
       }
     }
   }
@@ -156,19 +164,23 @@ top_n <- function(df, x) {
   }
 }
 
-
 library("tidyverse")
 library("org.Hs.eg.db")
 library("biomartr")
 library("magrittr")
 library("Biostrings")
 library("dplyr")
-ptm <- proc.time()
+library("tibble")
+library("diffdf")
 
 setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
 file.names <- list.files(path, pattern = ".csv")
 
+ptm <- proc.time()
+
+
+# 
 # file <-
 #   read_delim(
 #     file.names[1],
@@ -195,7 +207,7 @@ file.names <- list.files(path, pattern = ".csv")
 # 
 # 
 # 
-#used for testing
+# #used for testing
 # dr<- df
 df<- dr
 
@@ -213,10 +225,10 @@ ctr$Cohort <- c("CTR")
 percentile_ctr <- quant(ctr)
 percentile_ad <- quant(ad)
 
-ctr_top <- top_n(ctr)
-ad_top <- top_n(ad)
+top_ctr <- top_n(ctr)
+top_ad <- top_n(ad)
 
-fasta <- as.data.frame(readAAStringSet("protiens.fasta"))
+fasta <- as.data.frame(readAAStringSet("proteins.fasta"))
 
 fasta <- tibble::rownames_to_column(fasta, "accession")
 colnames(fasta) <- c("accession", "seq")
@@ -229,8 +241,7 @@ symbols <- select(org.Hs.eg.db, uniprot, "SYMBOL", "UNIPROT")
 
 df <- filterer(df, 0.1, symbols)
 
-df <- add_symbols(df, symbols)
-
+ 
 
 df$N_terminus <- 'NULL'
 df$C_terminus <- 'NULL'
@@ -241,25 +252,25 @@ ctr <- split_ctr(df)
 ad <- split_ad(df, ctr)
 
 
-ad_seq <- as.data.frame(table(ad$Sequence))
-ad_seq$Cohort <- c("AD")
-ctr_seq <- as.data.frame(table(ctr$Sequence))
-ctr_seq$Cohort <- c("CTR")
+seq_ad <- as.data.frame(table(ad$Sequence))
+seq_ad$Cohort <- c("AD")
+seq_ctr <- as.data.frame(table(ctr$Sequence))
+seq_ctr$Cohort <- c("CTR")
 
-all_seq <- (rbind(ad_seq, ctr_seq))
-all_seq$Var1 <- as.character(all_seq$Var1)
+seq_all <- (rbind(seq_ad, seq_ctr))
+seq_all$Var1 <- as.character(seq_all$Var1)
 
-start_seq <- vector("numeric", nrow(all_seq))
-N_terminus <- vector("character", nrow(all_seq))
-end_seq <- vector("numeric", nrow(all_seq))
-C_terminus <- vector("character", nrow(all_seq))
-protein <- vector("character", nrow(all_seq))
-cleavage_loc <- vector("numeric", nrow(all_seq))
+start_seq <- vector("numeric", nrow(seq_all))
+N_terminus <- vector("character", nrow(seq_all))
+end_seq <- vector("numeric", nrow(seq_all))
+C_terminus <- vector("character", nrow(seq_all))
+protein <- vector("character", nrow(seq_all))
+cleavage_loc <- vector("numeric", nrow(seq_all))
 
 
 cleavages <-
   data.frame(protein,
-             all_seq,
+             seq_all,
              cleavage_loc,
              start_seq,
              end_seq,
