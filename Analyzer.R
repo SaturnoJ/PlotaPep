@@ -127,6 +127,8 @@ locate <- function(cleavages, fasta) {
         
         locate <-
           as.data.frame(str_locate(fasta$seq[i], cleavages$Var1[j]))
+        print(locate$start)
+        print(is.na(locate))
         if(!is.na(locate)){
           cleavages$start_seq[j] <- locate$start
           cleavages$end_seq[j] <- locate$end
@@ -166,7 +168,9 @@ library("tidyverse")
 library("org.Hs.eg.db")
 library("Biostrings")
 # library("diffdf")
-main <- function(){
+library("arsenal")
+
+
 setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
 file.names <- list.files(path, pattern = ".csv")
@@ -278,11 +282,8 @@ cleavages <- load_protein(cleavages, df)
 cleavages <- locate(cleavages, fasta)
 
 cleavages <- cut_at(cleavages)
-
-
-
-return(cleavages)
-
-}
-proc.time() - ptm
+# x<-summary(comparedf(top_ad,top_ctr, by = "Var1"))
+# fileConn<-file("compared.txt")
+# write(x,fileConn)
+# proc.time() - ptm
 end
