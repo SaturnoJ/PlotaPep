@@ -1,7 +1,10 @@
-#Tally
+# Tally
+
 name is subject to change.
 Tally is a proteolytic cleavage analysis tool. Tally takes in matched spectra from CSV files and determines what specific peptide cleavages occured in that spectra analysis.
-#Installation
+
+## Installation
+
 Uses Biostrings, tidyverse, and org.Hs.eg.db R packages. 
 
 ```R
