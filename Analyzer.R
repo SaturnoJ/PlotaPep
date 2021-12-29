@@ -127,8 +127,6 @@ locate <- function(cleavages, fasta) {
         
         locate <-
           as.data.frame(str_locate(fasta$seq[i], cleavages$Var1[j]))
-        print(locate$start)
-        print(is.na(locate))
         if(!is.na(locate)){
           cleavages$start_seq[j] <- locate$start
           cleavages$end_seq[j] <- locate$end
@@ -166,13 +164,9 @@ top_n <- function(df, x) {
 
 library("tidyverse")
 library("org.Hs.eg.db")
-library("biomartr")
-library("magrittr")
 library("Biostrings")
-library("dplyr")
-library("tibble")
-library("diffdf")
-
+# library("diffdf")
+main <- function(){
 setwd("V:/Jason/HendriksFilesSemiTrytpic/CSV")
 path <- "V:/Jason/HendriksFilesSemiTrytpic/CSV"
 file.names <- list.files(path, pattern = ".csv")
@@ -180,7 +174,7 @@ file.names <- list.files(path, pattern = ".csv")
 ptm <- proc.time()
 
 
-# 
+
 # file <-
 #   read_delim(
 #     file.names[1],
@@ -287,5 +281,8 @@ cleavages <- cut_at(cleavages)
 
 
 
+return(cleavages)
+
+}
 proc.time() - ptm
 end
