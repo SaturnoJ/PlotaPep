@@ -9,13 +9,14 @@ ui <- dashboardPage(
                 
                 fluidRow(box(
                   uiOutput("fastaInput"),
-                  
+                  textOutput("test"),
                   
                   uiOutput("fileInput"),
                   disabled(actionButton("confirmFasta", "Confirm FASTA Input")),
                  
                   uiOutput("uniprot"),
                   uiOutput("confirmFile"),
+                  disabled(downloadButton('download',"Download the table"))
                   
                 ))
                 , fluidRow(dataTableOutput("contents")))

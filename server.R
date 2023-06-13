@@ -25,7 +25,6 @@ remove_tryp <- function(df) {
 }
 # Function finds semi-trypic cleavages in dataset by looping through comparing the amino acid before the sequence and ending amino acid in the sequence.
 find_semi <- function(df) {
-  print(df)
   if (nrow(df) > 0) {
     for (i in 1:nrow(df)) {
       if (df$`Peptide Previous AA`[i] == "R" |
@@ -166,6 +165,8 @@ server <- function(input, output, session) {
   
   fastaR <- reactiveVal()
   files <- reactiveVal()
+  uniprot <- reactiveVal()
+  downloadData <- reactiveVal()
   df <- data.frame()
   output$fastaInput <- renderUI({
     "txt"
@@ -213,7 +214,7 @@ server <- function(input, output, session) {
   output$uniprot <- renderUI({
     req(input$files)
     
-    tagList(textInput("uniprot","Input Uniprot IDs seperated by commas (,)"))
+    tagList(textInput("uniprot","Input Uniprot IDs seperated by commas (,)",placeholder = "Example P05067, P02649, etc."),value = NULL)
   })
   
   observeEvent(input$fasta, {
@@ -227,11 +228,18 @@ server <- function(input, output, session) {
     
   })
   
- 
+  output$download<- renderUI({
+    "txt"
+    tagList(
+      
+      # close file input
+    ) # close tag list
+  })
 
   observeEvent(input$confirmFile,{
     shinyjs::hide("fileInput")
     shinyjs::hide("confirmFile")
+    shinyjs::hide("uniprot")
     fasta <- as.data.frame(fastaR())
     df <- as.data.frame(files())
     df <- remove_false(df)
@@ -252,16 +260,15 @@ server <- function(input, output, session) {
       top_ctr <- top_n(ctr)
       
     }
-    
+    ids<-unlist(uniprot())
 
-    
     fasta <- tibble::rownames_to_column(fasta, "accession")
     colnames(fasta) <- c("accession", "seq")
     
 
-    uniprot <- c("P05067", "P02649", "P10636", "P10909", "P04156")
     
-    symbols <- select(org.Hs.eg.db, uniprot, "SYMBOL", "UNIPROT")
+    
+    symbols <- select(org.Hs.eg.db, ids, "SYMBOL", "UNIPROT")
     
     
     
@@ -312,9 +319,18 @@ server <- function(input, output, session) {
     cleavages <- cut_at(cleavages)
     
     output$contents <- renderDataTable(cleavages)
+    
+    downloadData(cleavages)
+    shinyjs::enable("download")
+    
   })
   
-  
+  output$download <- downloadHandler(
+    filename = function(){"processed_data.csv"}, 
+    content = function(fname){
+      write.csv(downloadData(), fname)
+    }
+  )
   observeEvent(input$files, {
     files <- input$files
     for (i in 1:nrow(files)) {
@@ -348,7 +364,16 @@ server <- function(input, output, session) {
       
     }
     files(df)
-    shinyjs::enable("confirmFile")
+    observeEvent(input$uniprot, {
+      uniprotTemp <- input$uniprot
+      uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
+      uniprot(uniprotTemp)
+      if(!is.null(uniprot)){
+        shinyjs::enable("confirmFile")
+        
+      }
+      
+    })
     
   })
   
