@@ -65,7 +65,7 @@ split_ad <- function(df, ctr) {
 load_semi <- function(cleavages, df) {
   for (i in 1:nrow(cleavages)) {
     for (j in 1:nrow(df)) {
-      if (cleavages$Var1[i] == df$Sequence[j]) {
+      if (cleavages$Sequence[i] == df$Sequence[j]) {
         cleavages$N_terminus[i] <- df$N_terminus[j]
         cleavages$C_terminus[i] <- df$C_terminus[j]
         break
@@ -78,7 +78,7 @@ load_semi <- function(cleavages, df) {
 load_protein <- function(cleavages, df) {
   for (i in 1:nrow(df)) {
     for (j in 1:nrow(cleavages)) {
-      if (df$Sequence[i] == cleavages$Var1[j] &&
+      if (df$Sequence[i] == cleavages$Sequence[j] &&
           !is.null(cleavages$protein[j])) {
         cleavages$protein[j] <- df$Accession[i]
       }
@@ -128,7 +128,7 @@ locate <- function(cleavages, fasta) {
     for (j in 1:nrow(cleavages)) {
       if (grepl(cleavages$protein[j], fasta$accession[i])) {
         locate <-
-          as.data.frame(str_locate(fasta$seq[i], cleavages$Var1[j]))
+          as.data.frame(str_locate(fasta$seq[i], cleavages$Sequence[j]))
         if (!is.na(locate)) {
           cleavages$start_seq[j] <- locate$start
           cleavages$end_seq[j] <- locate$end
@@ -291,7 +291,7 @@ server <- function(input, output, session) {
     seq_ctr$Cohort <- c("CTR")
     
     seq_all <- (rbind(seq_ad, seq_ctr))
-    seq_all$Var1 <- as.character(seq_all$Var1)
+    seq_all$Sequence <- as.character(seq_all$Sequence)
     
     start_seq <- vector("numeric", nrow(seq_all))
     N_terminus <- vector("character", nrow(seq_all))
