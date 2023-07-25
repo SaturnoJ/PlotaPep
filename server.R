@@ -52,6 +52,8 @@ split_ctr <- function(df) {
   }
   return(df)
 }
+
+
 # Uses the control fileName to intersect with main dataset to get Alzheimer's Dementia cohort from set.
 split_ad <- function(df, ctr) {
   df <- subset(df, !(df$fileName %in% ctr$fileName))
