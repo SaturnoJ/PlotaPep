@@ -12,9 +12,13 @@ ui <- dashboardPage(
                   textOutput("test"),
                   
                   uiOutput("fileInput"),
+                  uiOutput("intensityInput"),
+                  uiOutput("lfqInput"),
+                  uiOutput("cutoffInput"),
+                  uiOutput("fileTypeInput"),
                   disabled(actionButton("confirmFasta", "Confirm FASTA Input")),
                  
-                  uiOutput("uniprot"),
+                  uiOutput("uniprotInput"),
                   uiOutput("confirmFile"),
                   disabled(downloadButton('download',"Download the table"))
                   
