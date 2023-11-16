@@ -12,83 +12,129 @@ library("dplyr")
 library("stringr")
 library("seqinr")
 library("rstatix")
+library(data.table)
+library(magrittr)
 
 # clean the data
+#################
+cleanData <-
+  function(df,
+           intensity,
+           lfq,
+           cutoff,
+           updateProgress = NULL) {
+    if (is.function(updateProgress)) {
+      text <- "Cleaning Data"
+      updateProgress(detail = text)
+    }
+    
+    cleaned_df <-
+      clean_combined_peptide_fragger(df, intensity, lfq, cutoff)
+  
+    if (is.function(updateProgress)) {
+      text <- "Removing Outliers"
+      updateProgress(detail = text)
+    }
+    outlier_removed_df <- outlier_remover(cleaned_df)
+    
+    
+    
+    combined_cutoff_df <- outlier_removed_df %>%
+      mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
+      group_by(Protein) %>%
+      mutate(countMissingValues = sum(!is.na(Intensity))) %>%
+      mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
+      filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
+      dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
+    
+    
+    return(as.data.frame(combined_cutoff_df))
+  }
+
+
 clean_combined_peptide_fragger <-
-  function(dataset, Intensity, MaxLFQ, cutoff) {
-    #change Protein name
-    names(dataset)[names(dataset) == 'Protein ID'] <- 'ProteinID'
-    names(dataset)[names(dataset) == 'Peptide Sequence'] <-
+  function(df, intensity, lfq, cutoff) {
+    # change Protein name
+    names(df)[names(df) == 'Peptide Sequence'] <-
       'Sequence'
-    
     #Select columns of interest
-    dataset <-
-      dplyr::mutate(dataset, Protein = paste0(ProteinID, "_", Gene, "_", Sequence))
-    
+    df <-
+      unite(df,
+            Protein,
+            c(Protein, Sequence),
+            sep = "|",
+            remove = FALSE)
     # Select the specified Intensity.
     # We also start creating the substring we will remove from sample names.
-    if (Intensity == 0) {
-      dataset <-
-        dplyr::select(
-          dataset,
-          Protein,
-          contains("Intensity"),-contains("Total"),-contains("Unique")
-        )
+    if (intensity == 0) {
+      df <-
+        dplyr::select(df,
+                      Protein,
+                      contains("Intensity"),-contains("Total"),-contains("Unique"))
       removeSubString <- paste0(" ", "Intensity")
-    } else if (Intensity == 1) {
-      dataset <-
-        dplyr::select(dataset, Protein, contains("Total Intensity"))
+    } else if (intensity == 1) {
+      df <-
+        dplyr::select(df, Protein, contains("Total Intensity"))
       removeSubString <- paste0(" ", "Total", " Intensity")
     } else {
-      dataset <-
-        dplyr::select(dataset, Protein, contains("Unique Intensity"))
+      df <-
+        dplyr::select(df, Protein, contains("Unique Intensity"))
       removeSubString <- paste0(" ", "Unique", " Intensity")
     }
     
     #select or not select MaxLFQ
-    if (MaxLFQ == 0) {
-      dataset <- dplyr::select(dataset, Protein, contains("MaxLFQ"))
+    if (lfq == 0) {
+      df <- dplyr::select(df, Protein, contains("MaxLFQ"))
       removeSubString <- paste0(" MaxLFQ", removeSubString)
     } else {
-      dataset <-
-        dplyr::select(dataset,
+      df <-
+        dplyr::select(df,
                       Protein,
                       contains("Intensity"),-contains("MaxLFQ"))
     }
     
     #col to rowname
-    dataset <- tibble::column_to_rownames(dataset, "Protein")
+    df <- data.frame(df[, -1], row.names = df[, 1])
+    
     
     #Get rid of substring part we do not need
-    colnames(dataset) <-
-      stringr::str_remove(colnames(dataset), removeSubString)
+    
+    colnames(df) <-
+      stringr::str_remove(colnames(df), removeSubString)
+    
     
     #transpose, remove zeros, log2
-    dataset <- data.frame(t(dataset))
-    dataset[dataset == 0] <- NA
-    dataset <- log2(dataset)
+    df_transposed <-  transpose(df)
+    
+    rownames(df_transposed) <- colnames(df)
+    colnames(df_transposed) <- rownames(df)
+    df <- df_transposed
+    
+    df <- removeZero(df)
+    df <- log2(df)
+    
+    
     
     #apply cutoff on the protein level
     
-    dataset <-
-      purrr::discard(dataset, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
+    df <-
+      purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
     
     
     #Long Format it
-    dataset <- tibble::rownames_to_column(dataset, "Sample")
-    dataset <-
-      tidyr::gather(dataset,
-                    colnames(dataset)[2:ncol(dataset)],
-                    key = "Protein",
-                    value = "Intensity")
+    df <- setDT(df, keep.rownames = "Sample")
+    df <- tidyr::gather(df,
+                        colnames(df)[2:ncol(df)],
+                        key = "Protein",
+                        value = "Intensity")
     
-    return(dataset)
+    return(df)
   }
 
-##Remove the outliers
-OutlierRemover <- function(dataset) {
+
+outlier_remover <- function(df) {
   #Determine correlations between sample and theoretical
-  SampleCorrelations <- dataset %>%
+  SampleCorrelations <- df %>%
     group_by(Protein) %>%
     dplyr::mutate(medianProtein = median(Intensity, na.rm = T)) %>%
     ungroup() %>%
@@ -106,12 +152,12 @@ OutlierRemover <- function(dataset) {
     )))
   
   #Make the DF that we will return (i.e. without outliers)
-  returnDataset <- dataset %>%
+  returndf <- df %>%
     dplyr::filter(Sample %in% dplyr::filter(SampleCorrelations, Outlier == F)$Sample) %>%
     dplyr::select(Protein, Sample, Intensity)
   
   #Half minimum value (per protein) imputation
-  PCA_DF <- dataset %>%
+  PCA_DF <- df %>%
     group_by(Protein) %>%
     dplyr::mutate(IntensImputed = replace_na(Intensity, mean(Intensity, na.rm = T) /
                                                2)) %>%
@@ -126,118 +172,148 @@ OutlierRemover <- function(dataset) {
   pc1var <- round(variance_percentage[1], digits = 0)
   pc2var <- round(variance_percentage[2], digits = 0)
   
-  return(returnDataset)
+  return(returndf)
 }
 
+removeZero <- function(df) {
+  for (j in seq_len(ncol(df))) {
+    set(df, which((df[[j]]) == 0), j, NA)
+  }
+  return(df)
+}
 
-##extracts the alzheimers dataset from the merged dataset
+#################
+
+
+cohortSplit <-
+  function(combined_cutoff_df,
+           updateProgress = NULL) {
+    if (is.function(updateProgress)) {
+      text <- "Creating Cohorts"
+      updateProgress(detail = text)
+    }
+    
+    control_df <- split_ctr(combined_cutoff_df)
+    control_df <- cbind(control_df, "CTR")
+    colnames(control_df) <-
+      c('Sample', 'Protein', 'Intensity', 'DX')
+    alzheimers_df <-
+      split_disease(combined_cutoff_df, control_df)
+    alzheimers_df <- cbind(alzheimers_df, "AD")
+    colnames(alzheimers_df) <-
+      c('Sample', 'Protein', 'Intensity', 'DX')
+    cohort_df <- rbind(control_df, alzheimers_df)
+    
+    
+    
+    if (is.function(updateProgress)) {
+      text <- "Cohort Created"
+      updateProgress(detail = text)
+    }
+    
+    return(as.data.frame(cohort_df))
+  }
+
+
+##extracts the alzheimers df from the merged df
 split_disease <- function(df, ctr) {
   df <- subset(df, !grepl("CTR", df$Sample))
-  if (isEmpty(df)) {
+  if (nrow(df)< 0) {
     return(NULL)
   }
   return(df)
   
 }
 
-##extracts the control dataset from the merged dataset
+##extracts the control df from the merged df
 split_ctr <- function(combined_cutoff_df) {
   df <-
-    subset(combined_cutoff_df,
+    subset(`combined_cutoff_df`,
            grepl("CTR", combined_cutoff_df$Sample))
-  if (isEmpty(df)) {
+  if (nrow(df)< 0) {
     return(NULL)
   }
   return(df)
 }
-# Loads already found semi-trypic values into aggregated dataset.
-load_semi <- function(cleavages, df) {
-  for (i in 1:nrow(cleavages)) {
-    for (j in 1:nrow(df)) {
-      if (cleavages$Sequence[i] == df$Sequence[j]) {
-        cleavages$N_terminus[i] <- df$N_terminus[j]
-        cleavages$C_terminus[i] <- df$C_terminus[j]
-        break
-      }
+
+
+##########################################
+
+
+
+
+getTtest <-
+  function(cohort_df,
+           updateProgress = NULL) {
+    if (is.function(updateProgress)) {
+      text <- "Performing Ttest"
+      updateProgress(detail = text)
     }
+    
+    ttest_results <-  cohort_df %>%
+      
+      
+      #Run the T-test and adjustments
+      group_by(Protein) %>%
+      t_test(Intensity ~ DX, detailed = T) %>%
+      adjust_pvalue(method = "BH") %>%
+      
+      #Split the Protein name in Uniprot and Gene
+      separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide"))  %>%
+      
+      #Determine Fold change. Since we work with log-transformed values we can just substract
+      mutate(FC = estimate1 - estimate2) %>%
+      
+      #Create log10 p-vals
+      mutate(log10adjustP = -1 * log10(p.adj)) %>%
+      
+      #Determine if up or down regulated
+      mutate(Direction = ifelse(p.adj > 0.05, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
+    
+    ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
+    # located_peptides <- ttest_results[(grepl(paste(dfIds),ttest_results$UniprotID))]
+    ttest_results <-
+      cbind(ttest_results,
+            start_seq = NA,
+            end_seq = NA)
+    
+    if (is.function(updateProgress)) {
+      text <- "Ttest Complete"
+      updateProgress(detail = text)
+    }
+    
+    return(as.data.frame(ttest_results))
   }
-  return(cleavages)
-}
-# Loads protein symbols into aggregate dataset
-load_protein <- function(cleavages, df) {
+
+
+
+
+
+
+
+
+
+
+locate <- function(df) {
   for (i in 1:nrow(df)) {
-    for (j in 1:nrow(cleavages)) {
-      if (df$Sequence[i] == cleavages$Sequence[j] &&
-          !is.null(cleavages$protein[j])) {
-        cleavages$protein[j] <- df$Accession[i]
-      }
+    postion <-
+      as.data.frame(str_locate(df$x[i], df$Peptide[i]))
+    if (nrow(postion) != 0) {
+      df$start_seq[i] <- postion$start
+      df$end_seq[i] <- postion$end
     }
-  }
-  return(cleavages)
-}
-# Loads where missed cleavage location occurred into aggregate dataset
-cut_at <- function(cleavages) {
-  for (i in 1:nrow(cleavages)) {
-    if (cleavages$N_terminus[i] == "False") {
-      cleavages$cleavage_loc[i] <- cleavages$start_seq[i]
-    } else if (cleavages$C_terminus[i] == "False") {
-      cleavages$cleavage_loc[i] <- cleavages$end_seq[i]
+    else{
+      df$start_seq[i] <- NA
+      df$end_seq[i] <- NA
     }
+
   }
   
-  return(cleavages)
-}
-# Filters out proteins above cutoff and not being searched for
-filterCutSym <- function(df, cutoff, symbols) {
-  df <- filter(df, cutoff > df$Expect)
-  x <- NULL
-  for (i in 1:nrow(symbols)) {
-    y <- filter(df,
-                grepl(symbols$UNIPROT[i], df$Accession))
-    x <- rbind(x, y)
-  }
-  df <- x
+  return(df)
   
-  return(df)
-}
-# Adds symbols to Accession column in dataframe
-add_symbols <- function(df, symbols) {
-  for (i in 1:nrow(symbols)) {
-    for (j in 1:nrow(df)) {
-      if (grepl(symbols$UNIPROT[i], df$Accession[j])) {
-        df$Accession[j] <- symbols$SYMBOL[i]
-      }
-    }
-  }
-  return(df)
 }
 
-locate <- function(cleavages, fasta) {
-  for (i in 1:nrow(fasta)) {
-    for (j in 1:nrow(cleavages)) {
-      if (grepl(cleavages$protein[j], fasta$accession[i])) {
-        locate <-
-          as.data.frame(str_locate(fasta$seq[i], cleavages$Sequence[j]))
-        if (!is.na(locate)) {
-          cleavages$start_seq[j] <- locate$start
-          cleavages$end_seq[j] <- locate$end
-        }
-      }
-    }
-  }
-  return(cleavages)
-}
 
-remove_false <- function(df) {
-  return(subset(df, !grepl("XXX", df$Accession)))
-}
-quant <- function(proteins, x) {
-  if (missing(x)) {
-    return(subset(proteins, Freq > quantile(proteins$Freq, probs = 0.95)))
-  } else {
-    return(subset(proteins, Freq > quantile(proteins$Freq, probs = x)))
-  }
-}
 
 top_n <- function(df, x) {
   df <- df[order(-df$Freq), ]
@@ -249,12 +325,16 @@ top_n <- function(df, x) {
 }
 
 
+
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 30 * 1024 ^ 3)
   
   fastaR <- reactiveVal()
   files <- reactiveVal()
   uniprot <- reactiveVal()
+  intensity <- reactiveVal()
+  lfq <- reactiveVal()
+  cutoff <- reactiveVal()
   downloadData <- reactiveVal()
   df <- data.frame()
   output$fastaInput <- renderUI({
@@ -270,6 +350,30 @@ server <- function(input, output, session) {
         placeholder = "No FASTA Selected"
       )
     )
+  })
+  
+  
+  
+  
+  output$uniprotInput <- renderUI({
+    "txt"
+    req(input$fastaInput)
+    
+    tagList(
+      textInput(
+        "uniprotInput",
+        "Input Uniprot IDs ated by commas (,)",
+        placeholder = "Example P05067, P02649, etc."
+      ),
+      value = NULL
+    )
+  })
+  
+  observeEvent(input$confirmFasta, {
+    shinyjs::hide("fastaInput")
+    shinyjs::hide("confirmFasta")
+    shinyjs::hide("uniprotInput")
+    
   })
   
   output$fileInput <- renderUI({
@@ -295,9 +399,7 @@ server <- function(input, output, session) {
     "txt"
     
     req(input$confirmFasta)
-    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c(
-      "Max: " = 0, "None: " = 1
-    )))
+    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c("Max" = 0, "None" = 1)))
   })
   
   output$intensityInput <- renderUI({
@@ -308,16 +410,16 @@ server <- function(input, output, session) {
       "intensityInput",
       "Select Intensity : ",
       c(
-        "Intensity: " = 0,
-        "Total: " = 1,
-        "Unique: " = 2
+        "Intensity" = 0,
+        "Total" = 1,
+        "Unique" = 2
       )
     ))
   })
   
   output$cutoffInput <- renderUI({
     "txt"
-    req(input$confirmFasta)    
+    req(input$confirmFasta)
     tagList(numericInput(
       "cutoffInput",
       "Select Cutoff : ",
@@ -336,19 +438,7 @@ server <- function(input, output, session) {
     )))
   })
   
-  output$uniprotInput <- renderUI({
-    "txt"
-    req(input$fastaInput)
-    
-    tagList(
-      textInput(
-        "uniprotInput",
-        "Input Uniprot IDs seperated by commas (,)",
-        placeholder = "Example P05067, P02649, etc."
-      ),
-      value = NULL
-    )
-  })
+  
   
   observeEvent(input$fastaInput, {
     fastaR(readAAStringSet(input$fastaInput$datapath))
@@ -365,13 +455,8 @@ server <- function(input, output, session) {
     shinyjs::enable("confirmFasta")
     
   })
-  observeEvent(input$confirmFasta, {
-    shinyjs::hide("fastaInput")
-    shinyjs::hide("confirmFasta")
-    
-  })
   
-  
+  ###### $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$file screen$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ######
   
   observeEvent(input$fileInput, {
     files <- input$fileInput
@@ -395,110 +480,107 @@ server <- function(input, output, session) {
     }
     files(df)
     
+    shinyjs::enable("confirmFile")
     
   })
+  observeEvent(input$intensityInput, {
+    intensity(input$intensityInput)
+    
+  })
+  observeEvent(input$lfqInput, {
+    lfq(input$lfqInput)
+    
+    
+  })
+  observeEvent(input$cutoffInput, {
+    cutoff(input$cutoffInput)
+    
+  })
+  
+  ###### end file screen ######
+  
   
   observeEvent(input$confirmFile, {
     shinyjs::hide("fileInput")
     shinyjs::hide("confirmFile")
-    shinyjs::hide("uniprotInput")
+    shinyjs::hide("lfqInput")
+    shinyjs::hide("cutoffInput")
+    shinyjs::hide("intensityInput")
+    
+    uniprotIds <- as.data.frame(uniprot())
+    colnames(uniprotIds)  <- c("Protein.ID")
+    progress <- shiny::Progress$new()
+    progress$set(message = "Computing Data", value = 0)
+    # Close the progress when this reactive exits (even if there's an error)
+    on.exit(progress$close())
+    
+    
+    updateProgress <- function(value = NULL, detail = NULL) {
+      if (is.null(value)) {
+        value <- progress$getValue()
+        value <- value + (progress$getMax() - value) / 10
+      }
+      progress$set(value = value, detail = detail)
+    }
+    
     fasta <- as.data.frame(fastaR())
+    fasta <- tibble::rownames_to_column(fasta, "accession")
+    fasta %<>%
+      separate(accession, sep = '\\|', c("sp", "Protein.ID", "info"))
     df <- as.data.frame(files())
     
-    cleaned_df <-
-      clean_combined_peptide_fragger(df, 0, 1, 95)
+    combined_cutoff_df <-
+      cleanData(
+        df,
+        as.integer(intensity()),
+        as.integer(lfq()),
+        as.integer(cutoff()),
+        updateProgress
+      )
     
-    outlier_removed_df <- OutlierRemover(cleaned_df)
-    
-    
-    combined_cutoff_df <- outlier_removed_df %>%
-      mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
-      group_by(Protein) %>%
-      mutate(countMissingValues = sum(!is.na(Intensity))) %>%
-      mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
-      filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
-      dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
-    combined_cutoff_df <- as.data.frame(combined_cutoff_df)
     #######
     
-    control_df <- split_ctr(combined_cutoff_df)
-    control_df <- cbind(control_df, "CTR")
-    colnames(control_df) <-
-      c('Sample', 'Protein', 'Intensity', 'DX')
-    alzheimers_df <-
-      split_disease(combined_cutoff_df, control_df)
-    alzheimers_df <- cbind(alzheimers_df, "AD")
-    colnames(alzheimers_df) <-
-      c('Sample', 'Protein', 'Intensity', 'DX')
-    cohort_df <- rbind(control_df, alzheimers_df)
-    cohort_df$Protein <- gsub('\\.', 'A', cohort_df$Protein)
-    
-    ## change this shit
-    for (i in 1:nrow(cohort_df)) {
-      fn <- "_"
-      rp <- "A"
-      n <- 2
-      a <- str_count(cohort_df$Protein[i], "_")
-      if (a == 3) {
-        regmatches(cohort_df$Protein[i], gregexpr(fn, cohort_df$Protein[i])) <-
-          list(c(rep(fn, n - 1), rp))
-      }
-      i <- i - 1
-    }
     
     
-    ##Apply a peptide level cutoff of 95%
-    ttest_results <- cohort_df %>%
-      
-      
-      #Run the T-test and adjustments
-      group_by(Protein) %>%
-      t_test(Intensity ~ DX, detailed = T) %>%
-      adjust_pvalue(method = "BH") %>%
-      
-      #Split the Protein name in Uniprot and Gene
-      separate(Protein, c("UniprotID", "Gene", "Peptide")) %>%
-      
-      #Determine Fold change. Since we work with log-transformed values we can just substract
-      mutate(FC = estimate1 - estimate2) %>%
-      
-      #Create log10 p-vals
-      mutate(log10adjustP = -1 * log10(p.adj)) %>%
-      
-      #Determine if up or down regulated
-      mutate(Direction = ifelse(p.adj > 0.05, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
     
-    ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
-    located_peptides <- ttest_results %>%
-      filter(UniprotID == protein)
+    
+    cohort_df <- cohortSplit(combined_cutoff_df, updateProgress)
+    
+  
+    
+    
+    ttest_results <- getTtest(cohort_df, updateProgress)
+
+ 
+    
+    leftovers <- anti_join(ttest_results, fasta, by = "Protein.ID")
+    
+    ttest_results %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
+    
+    
     located_peptides <-
-      cbind(located_peptides,
-            start_seq = NA,
-            end_seq = NA)
-    locate_peptides <- function(cleavages, fasta) {
-      for (i in 1:nrow(cleavages)) {
-        locate <-
-          as.data.frame(str_locate(toString(fasta$seq), toString(cleavages$Peptide[i])))
-        cleavages$start_seq[i] <- locate$start
-        cleavages$end_seq[i] <- locate$end
-      }
-      return(cleavages)
-    }
-    located_peptides <-
-      locate_peptides(located_peptides, fasta)
-    
+      locate(ttest_results)
     
     ##Plot the peptides within the protein
     #We need to select the protein we want first
-    proteinWeWantToPlot <- ttest_results %>%
-      filter(UniprotID == protein)
-    filtered_results <- ttest_results %>%
-      filter(UniprotID == protein)
     
-    protein_length <- nchar(fasta$seq)
+    for ( i in unique(uniprotIds$Protein.ID)){
+    
+    proteinWeWantToPlot <- inner_join(located_peptides,uniprotIds, by  = "Protein.ID", multiple = "all")
+    filtered_results <- inner_join(located_peptides,uniprotIds, by  = "Protein.ID", multiple = "all")
+    fasta %<>% inner_join(proteinWeWantToPlot, by  = c('Protein.ID','x'), multiple = "all")
     
     #Now we can make the plot
-    proteinWeWantToPlot %>%
+    
+    browser()
+    
+
+      #Lets make a column based on significance
+      
+    protein_length <- unique(nchar(fasta$x))
+    
+    
+    proteinPlot <- proteinWeWantToPlot %>%
       
       #Lets make a column based on significance
       mutate(isSignificant = ifelse(filtered_results$p.adj < 0.05, "yes", "no")) %>%
@@ -524,19 +606,18 @@ server <- function(input, output, session) {
       #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
       geom_rect(
         aes(
-          xmin = located_peptides$start_seq,
+          xmin = proteinWeWantToPlot$start_seq,
           xmax = (
-            located_peptides$start_seq + (located_peptides$end_seq - located_peptides$start_seq)
+            proteinWeWantToPlot$start_seq + (proteinWeWantToPlot$end_seq - proteinWeWantToPlot$start_seq)
           ),
           ymin = filtered_results$FC - 0.05,
           ymax = filtered_results$FC + 0.05,
-          fill = isSignificant
+          # fill = isSignificant
         ),
         
         #Here I specify some stuff that will be universal for all blocks irrespective of column info.
         col = "black",
-        alpha = 0.75
-      ) +
+        alpha = 0.75, inherit.aes = FALSE) +
       
       #Set the Ggplot theme, limit the y-axis for FC.
       theme_bw() +
@@ -550,19 +631,27 @@ server <- function(input, output, session) {
       xlab("Protein Sequence") +
       ylab("FC")
     
+    
+    
+    output$plot <- renderPlot({
+      plot(proteinPlot)
+    }, res = 96)
+    
+    
     shinyjs::enable("download")
     
+    
+    output$download <- downloadHandler(
+      filename = function() { paste(input$dataset, '.png', sep='') },
+      content = function(file) {
+        device <- function(..., width, height) grDevices::png(..., width = width, height = height, res = 300, units = "in")
+        ggsave(file, plot = plotInput(), device = device)
+      }
+    )
+    }
   })
   
-  
-  output$download <- downloadHandler(
-    filename = function() {
-      "processed_data.csv"
-    },
-    content = function(fname) {
-      write.csv(downloadData(), fname)
-    }
-  )
+
   
   
   
