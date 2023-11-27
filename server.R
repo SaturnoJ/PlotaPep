@@ -14,6 +14,9 @@ library("seqinr")
 library("rstatix")
 library(data.table)
 library(magrittr)
+library(cowplot)
+
+
 
 # clean the data
 #################
@@ -29,13 +32,13 @@ cleanData <-
     }
     
     cleaned_df <-
-      clean_combined_peptide_fragger(df, intensity, lfq, cutoff)
-  
+      fraggerCleaner(df, intensity, lfq, cutoff)
+    
     if (is.function(updateProgress)) {
       text <- "Removing Outliers"
       updateProgress(detail = text)
     }
-    outlier_removed_df <- outlier_remover(cleaned_df)
+    outlier_removed_df <- removeOutlier(cleaned_df)
     
     
     
@@ -52,7 +55,7 @@ cleanData <-
   }
 
 
-clean_combined_peptide_fragger <-
+fraggerCleaner <-
   function(df, intensity, lfq, cutoff) {
     # change Protein name
     names(df)[names(df) == 'Peptide Sequence'] <-
@@ -132,7 +135,7 @@ clean_combined_peptide_fragger <-
   }
 
 
-outlier_remover <- function(df) {
+removeOutlier <- function(df) {
   #Determine correlations between sample and theoretical
   SampleCorrelations <- df %>%
     group_by(Protein) %>%
@@ -193,12 +196,12 @@ cohortSplit <-
       updateProgress(detail = text)
     }
     
-    control_df <- split_ctr(combined_cutoff_df)
+    control_df <- splitCtr(combined_cutoff_df)
     control_df <- cbind(control_df, "CTR")
     colnames(control_df) <-
       c('Sample', 'Protein', 'Intensity', 'DX')
     alzheimers_df <-
-      split_disease(combined_cutoff_df, control_df)
+      splitDisease(combined_cutoff_df, control_df)
     alzheimers_df <- cbind(alzheimers_df, "AD")
     colnames(alzheimers_df) <-
       c('Sample', 'Protein', 'Intensity', 'DX')
@@ -216,9 +219,9 @@ cohortSplit <-
 
 
 ##extracts the alzheimers df from the merged df
-split_disease <- function(df, ctr) {
+splitDisease <- function(df, ctr) {
   df <- subset(df, !grepl("CTR", df$Sample))
-  if (nrow(df)< 0) {
+  if (nrow(df) < 0) {
     return(NULL)
   }
   return(df)
@@ -226,11 +229,11 @@ split_disease <- function(df, ctr) {
 }
 
 ##extracts the control df from the merged df
-split_ctr <- function(combined_cutoff_df) {
+splitCtr <- function(combined_cutoff_df) {
   df <-
     subset(`combined_cutoff_df`,
            grepl("CTR", combined_cutoff_df$Sample))
-  if (nrow(df)< 0) {
+  if (nrow(df) < 0) {
     return(NULL)
   }
   return(df)
@@ -242,48 +245,46 @@ split_ctr <- function(combined_cutoff_df) {
 
 
 
-getTtest <-
-  function(cohort_df,
-           updateProgress = NULL) {
-    if (is.function(updateProgress)) {
-      text <- "Performing Ttest"
-      updateProgress(detail = text)
-    }
-    
-    ttest_results <-  cohort_df %>%
-      
-      
-      #Run the T-test and adjustments
-      group_by(Protein) %>%
-      t_test(Intensity ~ DX, detailed = T) %>%
-      adjust_pvalue(method = "BH") %>%
-      
-      #Split the Protein name in Uniprot and Gene
-      separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide"))  %>%
-      
-      #Determine Fold change. Since we work with log-transformed values we can just substract
-      mutate(FC = estimate1 - estimate2) %>%
-      
-      #Create log10 p-vals
-      mutate(log10adjustP = -1 * log10(p.adj)) %>%
-      
-      #Determine if up or down regulated
-      mutate(Direction = ifelse(p.adj > 0.05, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
-    
-    ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
-    # located_peptides <- ttest_results[(grepl(paste(dfIds),ttest_results$UniprotID))]
-    ttest_results <-
-      cbind(ttest_results,
-            start_seq = NA,
-            end_seq = NA)
-    
-    if (is.function(updateProgress)) {
-      text <- "Ttest Complete"
-      updateProgress(detail = text)
-    }
-    
-    return(as.data.frame(ttest_results))
+getTtest <- function(cohort_df, updateProgress = NULL) {
+  if (is.function(updateProgress)) {
+    text <- "Performing Ttest (This may take a while)"
+    updateProgress(detail = text)
   }
+  
+  ttest_results <-  cohort_df %>%
+    
+    
+    #Run the T-test and adjustments
+    group_by(Protein) %>%
+    t_test(Intensity ~ DX, detailed = T) %>%
+    adjust_pvalue(method = "BH") %>%
+    
+    #Split the Protein name in Uniprot and Gene
+    separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide"))  %>%
+    
+    #Determine Fold change. Since we work with log-transformed values we can just substract
+    mutate(FC = estimate1 - estimate2) %>%
+    
+    #Create log10 p-vals
+    mutate(log10adjustP = -1 * log10(p.adj)) %>%
+    
+    #Determine if up or down regulated
+    mutate(Direction = ifelse(p.adj > 0.05, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
+  
+  ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
+  # located_peptides() <- ttest_results[(grepl(paste(dfIds),ttest_results$UniprotID))]
+  ttest_results <-
+    cbind(ttest_results,
+          start_seq = NA,
+          end_seq = NA)
+  
+  if (is.function(updateProgress)) {
+    text <- "Ttest Complete"
+    updateProgress(detail = text)
+  }
+  
+  return(as.data.frame(ttest_results))
+}
 
 
 
@@ -294,7 +295,7 @@ getTtest <-
 
 
 
-locate <- function(df) {
+locatePeptides <- function(df) {
   for (i in 1:nrow(df)) {
     postion <-
       as.data.frame(str_locate(df$x[i], df$Peptide[i]))
@@ -306,23 +307,13 @@ locate <- function(df) {
       df$start_seq[i] <- NA
       df$end_seq[i] <- NA
     }
-
+    
   }
   
   return(df)
   
 }
 
-
-
-top_n <- function(df, x) {
-  df <- df[order(-df$Freq), ]
-  if (missing(x)) {
-    return(df <- head(df, -(nrow(df) - 100)))
-  } else {
-    return(df <- head(df, -(nrow(df) - x)))
-  }
-}
 
 
 
@@ -337,6 +328,16 @@ server <- function(input, output, session) {
   cutoff <- reactiveVal()
   downloadData <- reactiveVal()
   df <- data.frame()
+  protein_ids <- reactiveVal()
+  j <- reactiveVal(0)
+  located_peptides <- reactiveVal()
+  plotting_protein <- reactiveVal()
+  filtered_results <- reactiveVal()
+  protein_plotr <- reactiveVal()
+  filtered_results <- reactiveVal()
+  plot_fasta <- reactiveVal()
+  
+  
   output$fastaInput <- renderUI({
     "txt"
     tagList(
@@ -507,10 +508,14 @@ server <- function(input, output, session) {
     shinyjs::hide("cutoffInput")
     shinyjs::hide("intensityInput")
     
-    uniprotIds <- as.data.frame(uniprot())
-    colnames(uniprotIds)  <- c("Protein.ID")
+    
+    uniprot_ids <- as.data.frame(uniprot())
+    protein_plot <- list()
+    colnames(uniprot_ids)  <- c("Protein.ID")
+    
+    
     progress <- shiny::Progress$new()
-    progress$set(message = "Computing Data", value = 0)
+    progress$set(message = "Preparing Data", value = 0)
     # Close the progress when this reactive exits (even if there's an error)
     on.exit(progress$close())
     
@@ -527,6 +532,8 @@ server <- function(input, output, session) {
     fasta <- tibble::rownames_to_column(fasta, "accession")
     fasta %<>%
       separate(accession, sep = '\\|', c("sp", "Protein.ID", "info"))
+    
+    plot_fasta(fasta)
     df <- as.data.frame(files())
     
     combined_cutoff_df <-
@@ -546,114 +553,192 @@ server <- function(input, output, session) {
     
     cohort_df <- cohortSplit(combined_cutoff_df, updateProgress)
     
-  
+    
     
     
     ttest_results <- getTtest(cohort_df, updateProgress)
-
- 
+    
+    
     
     leftovers <- anti_join(ttest_results, fasta, by = "Protein.ID")
     
     ttest_results %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
     
     
-    located_peptides <-
-      locate(ttest_results)
-    
+    located_peptides(locatePeptides(ttest_results))
     ##Plot the peptides within the protein
     #We need to select the protein we want first
     
-    for ( i in unique(uniprotIds$Protein.ID)){
     
-    proteinWeWantToPlot <- inner_join(located_peptides,uniprotIds, by  = "Protein.ID", multiple = "all")
-    filtered_results <- inner_join(located_peptides,uniprotIds, by  = "Protein.ID", multiple = "all")
-    fasta %<>% inner_join(proteinWeWantToPlot, by  = c('Protein.ID','x'), multiple = "all")
-    
-    #Now we can make the plot
-    
-    browser()
-    
-
-      #Lets make a column based on significance
+    protein_ids(uniprot_ids)
+    for (i in unique(uniprot_ids$Protein.ID)) {
+      plotting_protein(filter(located_peptides(), Protein.ID == i))
+      filtered_results(filter(located_peptides(), Protein.ID == i))
+      filtered_results(inner_join(
+        fasta,
+        plotting_protein(),
+        by  = c('Protein.ID', 'x'),
+        multiple = "all"
+      ))
       
-    protein_length <- unique(nchar(fasta$x))
-    
-    
-    proteinPlot <- proteinWeWantToPlot %>%
       
-      #Lets make a column based on significance
-      mutate(isSignificant = ifelse(filtered_results$p.adj < 0.05, "yes", "no")) %>%
+      protein_length <- unique(nchar(filtered_results()$x))
       
-      #Start plotting
-      ggplot() +
       
-      #We take here the 'mean' but this is of course X-times the same value
-      #ylim(-2.5, 2.5)
-      xlim(1, protein_length) +
-      
-      #Create some lines to help visualise the start and end of the protein.
-      geom_vline(xintercept = 1,
-                 lwd = 2,
-                 alpha = .5) +
-      geom_vline(xintercept = protein_length,
-                 lwd = 2,
-                 alpha = 0.5) +
-      
-      #set a horizontal line to inform about FC = 0
-      geom_hline(yintercept = 0, color = "black") +
-      
-      #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
-      geom_rect(
-        aes(
-          xmin = proteinWeWantToPlot$start_seq,
-          xmax = (
-            proteinWeWantToPlot$start_seq + (proteinWeWantToPlot$end_seq - proteinWeWantToPlot$start_seq)
-          ),
-          ymin = filtered_results$FC - 0.05,
-          ymax = filtered_results$FC + 0.05,
-          # fill = isSignificant
-        ),
+      protein_plot[[i]] = plotting_protein() %>%
         
-        #Here I specify some stuff that will be universal for all blocks irrespective of column info.
-        col = "black",
-        alpha = 0.75, inherit.aes = FALSE) +
+        #Lets make a column based on significance
+        mutate(isSignificant = ifelse(filtered_results()$p.adj < 0.05, "yes", "no")) %>%
+        
+        #Start plotting
+        ggplot() +
+        
+        #We take here the 'mean' but this is of course X-times the same value
+        #ylim(-2.5, 2.5)
+        xlim(1, protein_length) +
+        
+        #Create some lines to help visualise the start and end of the protein.
+        geom_vline(xintercept = 1,
+                   lwd = 2,
+                   alpha = .5) +
+        geom_vline(xintercept = protein_length,
+                   lwd = 2,
+                   alpha = 0.5) +
+        
+        #set a horizontal line to inform about FC = 0
+        geom_hline(yintercept = 0, color = "black") +
+        
+        #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
+        geom_rect(
+          inherit.aes = FALSE,
+          aes(
+            xmin = plotting_protein()$start_seq,
+            xmax = (
+              plotting_protein()$start_seq + (
+                plotting_protein()$end_seq - plotting_protein()$start_seq
+              )
+            ),
+            ymin = filtered_results()$FC - 0.05,
+            ymax = filtered_results()$FC + 0.05,
+            fill = isSignificant
+          ),
+          
+          #Here I specify some stuff that will be universal for all blocks irrespective of column info.
+          col = "black",
+          alpha = 0.75,
+        ) +
+        
+        #Set the Ggplot theme, limit the y-axis for FC.
+        theme_bw() +
+        ylim(-2, 2) +
+        
+        #Specify the colours I want to use for the isSignificant column
+        scale_fill_manual(values = c("yes" = "red", "no" = "grey")) +
+        theme(legend.position = "bottom") +
+        
+        #x and yaxis titles
+        xlab("Protein Sequence") +
+        ylab("FC") +
+        
+        labs(title = as.character(i))
       
-      #Set the Ggplot theme, limit the y-axis for FC.
-      theme_bw() +
-      ylim(-2, 2) +
       
-      #Specify the colours I want to use for the isSignificant column
-      scale_fill_manual(values = c("yes" = "red", "no" = "grey")) +
-      theme(legend.position = "bottom") +
       
-      #x and yaxis titles
-      xlab("Protein Sequence") +
-      ylab("FC")
+      
+      
+    }
+    
+    
+    # output$plot <- renderUI({
+    #   renderPlot({
+    #   plot_grid(plotlist = protein_plot, ncol = 5)
+    #   })
+    # })
+    #
+    protein_plotr(protein_plot)
     
     
     
-    output$plot <- renderPlot({
-      plot(proteinPlot)
-    }, res = 96)
-    
-    
+    shinyjs::enable("clickThrough")
     shinyjs::enable("download")
     
     
-    output$download <- downloadHandler(
-      filename = function() { paste(input$dataset, '.png', sep='') },
-      content = function(file) {
-        device <- function(..., width, height) grDevices::png(..., width = width, height = height, res = 300, units = "in")
-        ggsave(file, plot = plotInput(), device = device)
-      }
-    )
-    }
+    
+    
+    # output$download <- downloadHandler(for (i in names(protein_plot)) {
+    #   # file_name = paste(i, ".png", sep = "")
+    #   # tiff(file_name)
+    #   # dev.off()
+    # })
+    #
   })
   
+  
+  
+  
+  
+  observeEvent(input$clickThrough, {
+    plots <- as.list(protein_plotr())
+    ids <- as.data.frame(protein_ids())
+    if (j() < nrow(as.data.frame(uniprot()))) {
+      output$plot <- renderUI({
+       
+        i <-  unique(ids[j(), 'Protein.ID'])
 
-  
-  
+        plotting_protein(filter(located_peptides(), Protein.ID == i))
+        filtered_results(filter(located_peptides(), Protein.ID == i))
+        filtered_results(inner_join(
+          plot_fasta(),
+          plotting_protein(),
+          by  = c('Protein.ID', 'x'),
+          multiple = "all"
+        ))
+        
+        
+        protein_length <- unique(nchar(filtered_results()$x))
+        
+        
+        renderPlot({
+
+          plots[[i]]
+          
+        })
+        
+      })
+      j(j() + 1)
+      
+    }
+        else {
+      output$plot <- renderUI({
+ 
+        i <-  unique(ids[j(), 'Protein.ID'])
+        
+        
+        
+        plotting_protein(filter(located_peptides(), Protein.ID == i))
+        filtered_results(filter(located_peptides(), Protein.ID == i))
+        filtered_results(inner_join(
+          plot_fasta(),
+          plotting_protein(),
+          by  = c('Protein.ID', 'x'),
+          multiple = "all"
+        ))
+        
+        protein_length <- unique(nchar(filtered_results()$x))
+        
+        
+        renderPlot({
+          
+          plots[[i]]
+        })
+        
+      })
+      j(1)
+      
+    }
+   
+    
+  })
   
   
   

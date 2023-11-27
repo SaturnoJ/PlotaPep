@@ -22,8 +22,8 @@ ui <- dashboardPage(
                     disabled(actionButton("confirmFasta", "Confirm FASTA Input")),
                     
                     uiOutput("confirmFile"),
-                    disabled(downloadButton('download', "Download the table"))
-                    
+                    disabled(downloadButton('download', "Download the table")),
+                    disabled(actionButton("clickThrough", "Next"))
                   )
                 )
                 , fluidRow(uiOutput("plot")))
