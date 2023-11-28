@@ -295,7 +295,14 @@ getTtest <- function(cohort_df, updateProgress = NULL) {
 
 
 
-locatePeptides <- function(df) {
+locatePeptides <- function(df,
+                           updateProgress = NULL) {
+  
+  if (is.function(updateProgress)) {
+    text <- "Matching peptides to proteins"
+    updateProgress(detail = text)
+  }
+  
   for (i in 1:nrow(df)) {
     postion <-
       as.data.frame(str_locate(df$x[i], df$Peptide[i]))
@@ -308,6 +315,11 @@ locatePeptides <- function(df) {
       df$end_seq[i] <- NA
     }
     
+  }
+  
+  if (is.function(updateProgress)) {
+    text <- "Peptides matched"
+    updateProgress(detail = text)
   }
   
   return(df)
@@ -446,6 +458,9 @@ server <- function(input, output, session) {
     observeEvent(input$uniprotInput, {
       uniprotTemp <- input$uniprotInput
       uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
+      
+      
+      
       uniprot(uniprotTemp)
       if (!is.null(uniprot)) {
         shinyjs::enable("confirmFile")
@@ -502,23 +517,23 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$confirmFile, {
+    
+    #UI LOGIC
+    ####### 
     shinyjs::hide("fileInput")
     shinyjs::hide("confirmFile")
     shinyjs::hide("lfqInput")
     shinyjs::hide("cutoffInput")
     shinyjs::hide("intensityInput")
+    #######
     
     
-    uniprot_ids <- as.data.frame(uniprot())
-    protein_plot <- list()
-    colnames(uniprot_ids)  <- c("Protein.ID")
-    
-    
+    #Progress bar
+    #######
     progress <- shiny::Progress$new()
     progress$set(message = "Preparing Data", value = 0)
     # Close the progress when this reactive exits (even if there's an error)
     on.exit(progress$close())
-    
     
     updateProgress <- function(value = NULL, detail = NULL) {
       if (is.null(value)) {
@@ -527,14 +542,26 @@ server <- function(input, output, session) {
       }
       progress$set(value = value, detail = detail)
     }
+    #######
+    
+    
+    #Variable Declaration
+    #######
+    uniprot_ids <- as.data.frame(uniprot())
+    protein_plot <- list()
+    colnames(uniprot_ids)  <- c("Protein.ID")
+    
+    
     
     fasta <- as.data.frame(fastaR())
     fasta <- tibble::rownames_to_column(fasta, "accession")
     fasta %<>%
       separate(accession, sep = '\\|', c("sp", "Protein.ID", "info"))
     
-    plot_fasta(fasta)
     df <- as.data.frame(files())
+    #######
+    
+    
     
     combined_cutoff_df <-
       cleanData(
@@ -545,32 +572,19 @@ server <- function(input, output, session) {
         updateProgress
       )
     
-    #######
-    
-    
-    
-    
-    
     cohort_df <- cohortSplit(combined_cutoff_df, updateProgress)
     
-    
-    
-    
     ttest_results <- getTtest(cohort_df, updateProgress)
-    
-    
     
     leftovers <- anti_join(ttest_results, fasta, by = "Protein.ID")
     
     ttest_results %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
     
-    
-    located_peptides(locatePeptides(ttest_results))
-    ##Plot the peptides within the protein
-    #We need to select the protein we want first
+    located_peptides(locatePeptides(ttest_results,updateProgress))
     
     
-    protein_ids(uniprot_ids)
+    #Plotting loop
+    #######
     for (i in unique(uniprot_ids$Protein.ID)) {
       plotting_protein(filter(located_peptides(), Protein.ID == i))
       filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -647,32 +661,73 @@ server <- function(input, output, session) {
       
       
     }
+    ######
+
     
-    
-    # output$plot <- renderUI({
-    #   renderPlot({
-    #   plot_grid(plotlist = protein_plot, ncol = 5)
-    #   })
-    # })
-    #
+    #Reactive Variables
+    ######
     protein_plotr(protein_plot)
-    
+    plot_fasta(fasta)
+    protein_ids(uniprot_ids)
+    ######
     
     
     shinyjs::enable("clickThrough")
-    shinyjs::enable("download")
+    shinyjs::enable("downloadPlot")
     
     
     
     
-    # output$download <- downloadHandler(for (i in names(protein_plot)) {
-    #   # file_name = paste(i, ".png", sep = "")
-    #   # tiff(file_name)
-    #   # dev.off()
-    # })
-    #
+  
+    
+    
+    
+    
+    
   })
   
+  output$downloadPlot <- downloadHandler(
+    
+filename = 'plots.zip',
+content = function(file){
+  
+  
+  owd <- setwd(tempdir())
+  on.exit(setwd(owd))
+  
+  
+  
+  
+  browser()
+  
+  
+  for(i in unique(protein_ids()$Protein.ID)){
+    
+    plotting_protein(filter(located_peptides(), Protein.ID == i))
+    filtered_results(filter(located_peptides(), Protein.ID == i))
+    filtered_results(inner_join(
+      plot_fasta(),
+      plotting_protein(),
+      by  = c('Protein.ID', 'x'),
+      multiple = "all"
+    ))
+    plots <- as.list(protein_plotr())
+
+    protein_length <- unique(nchar(filtered_results()$x))
+    if(protein_length > 0 ){
+    
+    ggsave(paste(as.character(i),".png",sep = ""),plot = plots[[i]],device = "png")
+    }
+  }
+  
+  zip_files <- list.files(path = getwd(), pattern = ".png$")
+  
+  zip::zip(file, files = zip_files)
+  
+  
+}
+    
+  )
   
   
   
