@@ -18,7 +18,8 @@ ui <- dashboardPage(
                     uiOutput("cutoffInput"),
                     uiOutput("fileTypeInput"),
                     uiOutput("uniprotInput"),
-                    
+                    uiOutput("cohortInput"),
+
                     disabled(actionButton("confirmFasta", "Confirm FASTA Input")),
                     
                     uiOutput("confirmFile"),

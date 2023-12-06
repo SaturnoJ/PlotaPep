@@ -31,6 +31,8 @@ cleanData <-
       updateProgress(detail = text)
     }
     
+    file <- df$file[1]
+    
     cleaned_df <-
       fraggerCleaner(df, intensity, lfq, cutoff)
     
@@ -38,6 +40,7 @@ cleanData <-
       text <- "Removing Outliers"
       updateProgress(detail = text)
     }
+    
     outlier_removed_df <- removeOutlier(cleaned_df)
     
     
@@ -50,6 +53,7 @@ cleanData <-
       filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
       dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
     
+    combined_cutoff_df$File <- file
     
     return(as.data.frame(combined_cutoff_df))
   }
@@ -57,9 +61,13 @@ cleanData <-
 
 fraggerCleaner <-
   function(df, intensity, lfq, cutoff) {
-    # change Protein name
-    names(df)[names(df) == 'Peptide Sequence'] <-
-      'Sequence'
+
+        # change Protein name
+    if (grepl('Peptide Sequence', names(df))) {
+      names(df)[names(df) == 'Peptide Sequence'] <-
+        'Sequence'
+    }
+    
     #Select columns of interest
     df <-
       unite(df,
@@ -73,7 +81,9 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"),-contains("Total"),-contains("Unique"))
+                      contains("Intensity"),
+                      -contains("Total"),
+                      -contains("Unique"))
       removeSubString <- paste0(" ", "Intensity")
     } else if (intensity == 1) {
       df <-
@@ -93,11 +103,11 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"),-contains("MaxLFQ"))
+                      contains("Intensity"), -contains("MaxLFQ"))
     }
     
     #col to rowname
-    df <- data.frame(df[, -1], row.names = df[, 1])
+    df <- data.frame(df[,-1], row.names = df[, 1])
     
     
     #Get rid of substring part we do not need
@@ -130,6 +140,7 @@ fraggerCleaner <-
                         colnames(df)[2:ncol(df)],
                         key = "Protein",
                         value = "Intensity")
+    
     
     return(df)
   }
@@ -187,25 +198,24 @@ removeZero <- function(df) {
 
 #################
 
-
+# Cohort Split
+########
 cohortSplit <-
   function(combined_cutoff_df,
+           cohort,
            updateProgress = NULL) {
     if (is.function(updateProgress)) {
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
+    browser()
+    cohort_df <- data.frame()
     
-    control_df <- splitCtr(combined_cutoff_df)
-    control_df <- cbind(control_df, "CTR")
-    colnames(control_df) <-
-      c('Sample', 'Protein', 'Intensity', 'DX')
-    alzheimers_df <-
-      splitDisease(combined_cutoff_df, control_df)
-    alzheimers_df <- cbind(alzheimers_df, "AD")
-    colnames(alzheimers_df) <-
-      c('Sample', 'Protein', 'Intensity', 'DX')
-    cohort_df <- rbind(control_df, alzheimers_df)
+    for (i in cohort) {
+      temp_df <- splitCtr(combined_cutoff_df, i)
+      cohort_df <- cbind(temp_df, i)
+      
+    }
     
     
     
@@ -220,7 +230,7 @@ cohortSplit <-
 
 ##extracts the alzheimers df from the merged df
 splitDisease <- function(df, ctr) {
-  df <- subset(df, !grepl("CTR", df$Sample))
+  df <- subset(df,!grepl("CTR", df$Sample))
   if (nrow(df) < 0) {
     return(NULL)
   }
@@ -229,10 +239,10 @@ splitDisease <- function(df, ctr) {
 }
 
 ##extracts the control df from the merged df
-splitCtr <- function(combined_cutoff_df) {
+splitCtr <- function(combined_cutoff_df, cohort) {
   df <-
-    subset(`combined_cutoff_df`,
-           grepl("CTR", combined_cutoff_df$Sample))
+    subset(combined_cutoff_df,
+           grepl(cohort, combined_cutoff_df$Sample))
   if (nrow(df) < 0) {
     return(NULL)
   }
@@ -240,10 +250,11 @@ splitCtr <- function(combined_cutoff_df) {
 }
 
 
-##########################################
+###########
 
 
-
+#TTest
+########
 
 getTtest <- function(cohort_df, updateProgress = NULL) {
   if (is.function(updateProgress)) {
@@ -287,7 +298,7 @@ getTtest <- function(cohort_df, updateProgress = NULL) {
 }
 
 
-
+#########
 
 
 
@@ -297,7 +308,6 @@ getTtest <- function(cohort_df, updateProgress = NULL) {
 
 locatePeptides <- function(df,
                            updateProgress = NULL) {
-  
   if (is.function(updateProgress)) {
     text <- "Matching peptides to proteins"
     updateProgress(detail = text)
@@ -348,7 +358,10 @@ server <- function(input, output, session) {
   protein_plotr <- reactiveVal()
   filtered_results <- reactiveVal()
   plot_fasta <- reactiveVal()
+  cohort_name <- reactiveVal()
   
+  #Fasta Input
+  #######
   
   output$fastaInput <- renderUI({
     "txt"
@@ -370,7 +383,6 @@ server <- function(input, output, session) {
   
   output$uniprotInput <- renderUI({
     "txt"
-    req(input$fastaInput)
     
     tagList(
       textInput(
@@ -382,12 +394,33 @@ server <- function(input, output, session) {
     )
   })
   
+  
+  observeEvent(input$fastaInput, {
+    fastaR(readAAStringSet(input$fastaInput$datapath))
+    observeEvent(input$uniprotInput, {
+      uniprotTemp <- input$uniprotInput
+      uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
+      uniprot(uniprotTemp)
+      
+    })
+    shinyjs::enable("confirmFasta")
+    
+  })
+  
   observeEvent(input$confirmFasta, {
     shinyjs::hide("fastaInput")
     shinyjs::hide("confirmFasta")
     shinyjs::hide("uniprotInput")
     
   })
+  
+  
+  
+  #######
+  
+  
+  #File Input
+  ######
   
   output$fileInput <- renderUI({
     "txt"
@@ -412,7 +445,7 @@ server <- function(input, output, session) {
     "txt"
     
     req(input$confirmFasta)
-    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c("Max" = 0, "None" = 1)))
+    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c("None" = 1,"Max" = 0)))
   })
   
   output$intensityInput <- renderUI({
@@ -436,7 +469,7 @@ server <- function(input, output, session) {
     tagList(numericInput(
       "cutoffInput",
       "Select Cutoff : ",
-      95,
+      99,
       min = 0,
       max = 100
     ))
@@ -452,53 +485,41 @@ server <- function(input, output, session) {
   })
   
   
-  
-  observeEvent(input$fastaInput, {
-    fastaR(readAAStringSet(input$fastaInput$datapath))
-    observeEvent(input$uniprotInput, {
-      uniprotTemp <- input$uniprotInput
-      uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
-      
-      
-      
-      uniprot(uniprotTemp)
-      if (!is.null(uniprot)) {
-        shinyjs::enable("confirmFile")
-        
-      }
-      
-    })
-    shinyjs::enable("confirmFasta")
+  output$cohortInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
     
+    tagList(
+      textInput(
+        "cohortInput",
+        "Input cohort identifiers seperated by commas (,). [These should be in the filename for the Fragger search]",
+        placeholder = "Example CTR, AD, DLB etc."
+      ),
+      value = NULL
+    )
   })
   
-  ###### $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$file screen$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ######
+  
+  ######
   
   observeEvent(input$fileInput, {
     files <- input$fileInput
+    df <- list()
     for (i in 1:nrow(files)) {
-      if (i == 1) {
-        df <- read_delim(files$datapath[i], show_col_types = FALSE)
-        
-        df$fileName <- files$name[i]
-        
-      }
-      else{
-        df1 <- read_delim(files$datapath[i],
-                          show_col_types = FALSE)
-        df1$fileName <- files$name[i]
-        
-        df <- rbind(df, df1)
-        
-        
-      }
+      df[[i]] <-
+        as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
+      
+      df[[i]]$fileName <- str_sub(files$name[i], end = -5)
+      
+      
+      
       
     }
     files(df)
     
-    shinyjs::enable("confirmFile")
-    
   })
+  
+  
   observeEvent(input$intensityInput, {
     intensity(input$intensityInput)
     
@@ -513,18 +534,37 @@ server <- function(input, output, session) {
     
   })
   
+  
+  observeEvent(input$cohortInput, {
+    nameTemp <- input$cohortInput
+    nameTemp <- strsplit(nameTemp, ", |,| , ")
+    cohort_name(unlist(nameTemp))
+    
+    if (!is.null(input$fileInput))
+      shinyjs::enable("confirmFile")
+    
+    
+  })
+  
+  
+  
+  
+  
+  
+  
   ###### end file screen ######
   
   
   observeEvent(input$confirmFile, {
-    
     #UI LOGIC
-    ####### 
+    #######
     shinyjs::hide("fileInput")
     shinyjs::hide("confirmFile")
     shinyjs::hide("lfqInput")
     shinyjs::hide("cutoffInput")
     shinyjs::hide("intensityInput")
+    shinyjs::hide("cohortInput")
+    shinyjs::hide("cohortNInput")
     #######
     
     
@@ -544,35 +584,41 @@ server <- function(input, output, session) {
     }
     #######
     
-    
     #Variable Declaration
     #######
+    combined_cutoff_df <- data.frame()
     uniprot_ids <- as.data.frame(uniprot())
     protein_plot <- list()
     colnames(uniprot_ids)  <- c("Protein.ID")
-    
-    
+    cohorts <- cohort_name()
     
     fasta <- as.data.frame(fastaR())
     fasta <- tibble::rownames_to_column(fasta, "accession")
     fasta %<>%
       separate(accession, sep = '\\|', c("sp", "Protein.ID", "info"))
     
-    df <- as.data.frame(files())
+    df <- files()
     #######
     
+    for (i in df) {
+      
+      temp <-
+        cleanData(
+          i,
+          as.integer(intensity()),
+          as.integer(lfq()),
+          as.integer(cutoff()),
+          updateProgress
+        )
+      
+      combined_cutoff_df <- rbind(combined_cutoff_df, temp)
+      
+    }
     
-    
-    combined_cutoff_df <-
-      cleanData(
-        df,
-        as.integer(intensity()),
-        as.integer(lfq()),
-        as.integer(cutoff()),
-        updateProgress
-      )
-    
-    cohort_df <- cohortSplit(combined_cutoff_df, updateProgress)
+    browser()
+     
+    cohort_df <-
+      cohortSplit(combined_cutoff_df, cohorts, updateProgress)
     
     ttest_results <- getTtest(cohort_df, updateProgress)
     
@@ -580,7 +626,7 @@ server <- function(input, output, session) {
     
     ttest_results %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
     
-    located_peptides(locatePeptides(ttest_results,updateProgress))
+    located_peptides(locatePeptides(ttest_results, updateProgress))
     
     
     #Plotting loop
@@ -662,7 +708,7 @@ server <- function(input, output, session) {
       
     }
     ######
-
+    
     
     #Reactive Variables
     ######
@@ -678,7 +724,7 @@ server <- function(input, output, session) {
     
     
     
-  
+    
     
     
     
@@ -687,45 +733,44 @@ server <- function(input, output, session) {
   })
   
   output$downloadPlot <- downloadHandler(
-    
-filename = 'plots.zip',
-content = function(file){
-  
-  
-  owd <- setwd(tempdir())
-  on.exit(setwd(owd))
-  
-  
-  
-  
-  browser()
-  
-  
-  for(i in unique(protein_ids()$Protein.ID)){
-    
-    plotting_protein(filter(located_peptides(), Protein.ID == i))
-    filtered_results(filter(located_peptides(), Protein.ID == i))
-    filtered_results(inner_join(
-      plot_fasta(),
-      plotting_protein(),
-      by  = c('Protein.ID', 'x'),
-      multiple = "all"
-    ))
-    plots <- as.list(protein_plotr())
-
-    protein_length <- unique(nchar(filtered_results()$x))
-    if(protein_length > 0 ){
-    
-    ggsave(paste(as.character(i),".png",sep = ""),plot = plots[[i]],device = "png")
+    filename = 'plots.zip',
+    content = function(file) {
+      owd <- setwd(tempdir())
+      on.exit(setwd(owd))
+      
+      
+      
+      
+      browser()
+      
+      plots <- as.list(protein_plotr())
+      
+      for (i in unique(protein_ids()$Protein.ID)) {
+        plotting_protein(filter(located_peptides(), Protein.ID == i))
+        if (nrow(plotting_protein()) > 0) {
+          filtered_results(filter(located_peptides(), Protein.ID == i))
+          filtered_results(inner_join(
+            plot_fasta(),
+            plotting_protein(),
+            by  = c('Protein.ID', 'x'),
+            multiple = "all"
+          ))
+          
+          protein_length <- unique(nchar(filtered_results()$x))
+          
+          
+          ggsave(paste(as.character(i), ".png", sep = ""),
+                 plot = plots[[i]],
+                 device = "png")
+        }
+      }
+      
+      zip_files <- list.files(path = getwd(), pattern = ".png$")
+      
+      zip::zip(file, files = zip_files)
+      
+      
     }
-  }
-  
-  zip_files <- list.files(path = getwd(), pattern = ".png$")
-  
-  zip::zip(file, files = zip_files)
-  
-  
-}
     
   )
   
@@ -737,9 +782,8 @@ content = function(file){
     ids <- as.data.frame(protein_ids())
     if (j() < nrow(as.data.frame(uniprot()))) {
       output$plot <- renderUI({
-       
         i <-  unique(ids[j(), 'Protein.ID'])
-
+        
         plotting_protein(filter(located_peptides(), Protein.ID == i))
         filtered_results(filter(located_peptides(), Protein.ID == i))
         filtered_results(inner_join(
@@ -754,7 +798,6 @@ content = function(file){
         
         
         renderPlot({
-
           plots[[i]]
           
         })
@@ -763,9 +806,8 @@ content = function(file){
       j(j() + 1)
       
     }
-        else {
+    else {
       output$plot <- renderUI({
- 
         i <-  unique(ids[j(), 'Protein.ID'])
         
         
@@ -783,7 +825,6 @@ content = function(file){
         
         
         renderPlot({
-          
           plots[[i]]
         })
         
@@ -791,7 +832,7 @@ content = function(file){
       j(1)
       
     }
-   
+    
     
   })
   
