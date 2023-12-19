@@ -14,8 +14,7 @@ library("seqinr")
 library("rstatix")
 library(data.table)
 library(magrittr)
-library(cowplot)
-
+library(shinydisconnect)
 
 
 # clean the data
@@ -31,7 +30,7 @@ cleanData <-
       updateProgress(detail = text)
     }
     
-    file <- df$file[1]
+    file <- df$File[1]
     
     cleaned_df <-
       fraggerCleaner(df, intensity, lfq, cutoff)
@@ -41,32 +40,39 @@ cleanData <-
       updateProgress(detail = text)
     }
     
-    outlier_removed_df <- removeOutlier(cleaned_df)
+    browser()
+     outlier_removed_df <- removeOutlier(cleaned_df)
     
+
+    # combined_cutoff_df <- outlier_removed_df %>%
+    #   mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
+    #   group_by(Protein) %>%
+    #   mutate(countMissingValues = sum(!is.na(Intensity))) %>%
+    #   mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
+    #   filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
+    #   dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
+    # 
+    # 
+    # combined_cutoff_df$File <- file
+    # 
+    # 
     
+
+     outlier_removed_df$File <- file
     
-    combined_cutoff_df <- outlier_removed_df %>%
-      mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
-      group_by(Protein) %>%
-      mutate(countMissingValues = sum(!is.na(Intensity))) %>%
-      mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
-      filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
-      dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
-    
-    combined_cutoff_df$File <- file
-    
-    return(as.data.frame(combined_cutoff_df))
+    return(as.data.frame(outlier_removed_df))
   }
 
 
 fraggerCleaner <-
   function(df, intensity, lfq, cutoff) {
-
-        # change Protein name
+    # change Protein name
     if (grepl('Peptide Sequence', names(df))) {
       names(df)[names(df) == 'Peptide Sequence'] <-
         'Sequence'
     }
+
+    
     
     #Select columns of interest
     df <-
@@ -81,9 +87,7 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"),
-                      -contains("Total"),
-                      -contains("Unique"))
+                      contains("Intensity"),-contains("Total"),-contains("Unique"))
       removeSubString <- paste0(" ", "Intensity")
     } else if (intensity == 1) {
       df <-
@@ -103,11 +107,11 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"), -contains("MaxLFQ"))
+                      contains("Intensity"),-contains("MaxLFQ"))
     }
     
     #col to rowname
-    df <- data.frame(df[,-1], row.names = df[, 1])
+    df <- data.frame(df[, -1], row.names = df[, 1])
     
     
     #Get rid of substring part we do not need
@@ -117,7 +121,7 @@ fraggerCleaner <-
     
     
     #transpose, remove zeros, log2
-    df_transposed <-  transpose(df)
+    df_transposed <-  data.frame(t(df))
     
     rownames(df_transposed) <- colnames(df)
     colnames(df_transposed) <- rownames(df)
@@ -147,6 +151,8 @@ fraggerCleaner <-
 
 
 removeOutlier <- function(df) {
+  
+
   #Determine correlations between sample and theoretical
   SampleCorrelations <- df %>%
     group_by(Protein) %>%
@@ -169,23 +175,7 @@ removeOutlier <- function(df) {
   returndf <- df %>%
     dplyr::filter(Sample %in% dplyr::filter(SampleCorrelations, Outlier == F)$Sample) %>%
     dplyr::select(Protein, Sample, Intensity)
-  
-  #Half minimum value (per protein) imputation
-  PCA_DF <- df %>%
-    group_by(Protein) %>%
-    dplyr::mutate(IntensImputed = replace_na(Intensity, mean(Intensity, na.rm = T) /
-                                               2)) %>%
-    dplyr::select(Protein, Sample, IntensImputed) %>%
-    spread(key = "Protein", value = "IntensImputed") %>%
-    column_to_rownames("Sample")
-  
-  #scale and PCA
-  PCA_DF_Results <- prcomp(scale(as.matrix(PCA_DF)))
-  eigs <- PCA_DF_Results$sdev ^ 2
-  variance_percentage <- (eigs / sum(eigs)) * 100
-  pc1var <- round(variance_percentage[1], digits = 0)
-  pc2var <- round(variance_percentage[2], digits = 0)
-  
+
   return(returndf)
 }
 
@@ -202,20 +192,22 @@ removeZero <- function(df) {
 ########
 cohortSplit <-
   function(combined_cutoff_df,
-           cohort,
+           ctr,
            updateProgress = NULL) {
     if (is.function(updateProgress)) {
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
-    browser()
+    
+
     cohort_df <- data.frame()
     
-    for (i in cohort) {
-      temp_df <- splitCtr(combined_cutoff_df, i)
-      cohort_df <- cbind(temp_df, i)
+      temp_ctr <- splitCtr(combined_cutoff_df, ctr)
+      temp_dx <- splitDisease(combined_cutoff_df,temp_ctr)
       
-    }
+      cohort_df <- rbind(temp_ctr, temp_dx)
+      
+  
     
     
     
@@ -228,21 +220,26 @@ cohortSplit <-
   }
 
 
-##extracts the alzheimers df from the merged df
+##extracts the dx df from the merged df
 splitDisease <- function(df, ctr) {
-  df <- subset(df,!grepl("CTR", df$Sample))
+  df <- anti_join(df, ctr, by = "Sample")
+  df$Cohort <- df$File[1]
+  
   if (nrow(df) < 0) {
     return(NULL)
   }
   return(df)
-  
+
 }
 
 ##extracts the control df from the merged df
 splitCtr <- function(combined_cutoff_df, cohort) {
+
   df <-
     subset(combined_cutoff_df,
            grepl(cohort, combined_cutoff_df$Sample))
+  df$Cohort <- cohort
+  
   if (nrow(df) < 0) {
     return(NULL)
   }
@@ -250,24 +247,94 @@ splitCtr <- function(combined_cutoff_df, cohort) {
 }
 
 
-###########
+######
 
+
+
+#Kruskal
+######
+
+getKruskal <- function(cohort_df, updateProgress = NULL) {
+  if (is.function(updateProgress)) {
+    text <- "Performing Kruskal(This may take a while)"
+    updateProgress(detail = text)
+  }
+  
+  browser()
+  
+  
+  kruskal_results <-    cohort_df %>% 
+    group_by(Protein) %>% 
+    kruskal_test(Intensity ~ Cohort) %>% 
+    adjust_pvalue(method = "BH") %>% 
+    separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide")) 
+  
+  kruskal_results <-
+    cbind(kruskal_results,
+          start_seq = NA,
+          end_seq = NA)
+  
+  if (is.function(updateProgress)) {
+    text <- "Kruskal Complete"
+    updateProgress(detail = text)
+  }
+  
+  return(as.data.frame(kruskal_results))
+}
+
+######
+
+
+#ANOVA
+########
+getANOVA <- function(cohort_df, updateProgress = NULL) {
+  if (is.function(updateProgress)) {
+    text <- "Performing ANOVA (This may take a while)"
+    updateProgress(detail = text)
+  }
+  browser()
+  
+  anova_results <- cohort_df %>%
+    drop_na(Intensity) %>%
+    group_by(Protein) %>%
+    rstatix::anova_test(Intensity ~ Cohort, detailed = T) %>%
+    adjust_pvalue(method = "BH") %>%
+    as_tibble() %>%
+    separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide")) %>%
+    magrittr::set_class(c("anova_test", "rstatix_test", "data.frame"))
+  
+  
+  browser()
+  if (is.function(updateProgress)) {
+    text <- "ANOVA Complete"
+    updateProgress(detail = text)
+  }
+  
+  return(anova_results)
+  
+  
+}
+
+
+
+########
 
 #TTest
 ########
 
-getTtest <- function(cohort_df, updateProgress = NULL) {
+getTtest <- function(cohort_df, p, updateProgress = NULL) {
   if (is.function(updateProgress)) {
     text <- "Performing Ttest (This may take a while)"
     updateProgress(detail = text)
   }
+  
   
   ttest_results <-  cohort_df %>%
     
     
     #Run the T-test and adjustments
     group_by(Protein) %>%
-    t_test(Intensity ~ DX, detailed = T) %>%
+    t_test(Intensity ~ Cohort, detailed = T) %>%
     adjust_pvalue(method = "BH") %>%
     
     #Split the Protein name in Uniprot and Gene
@@ -280,7 +347,7 @@ getTtest <- function(cohort_df, updateProgress = NULL) {
     mutate(log10adjustP = -1 * log10(p.adj)) %>%
     
     #Determine if up or down regulated
-    mutate(Direction = ifelse(p.adj > 0.05, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
+    mutate(Direction = ifelse(p.adj > p, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
   
   ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
   # located_peptides() <- ttest_results[(grepl(paste(dfIds),ttest_results$UniprotID))]
@@ -300,12 +367,60 @@ getTtest <- function(cohort_df, updateProgress = NULL) {
 
 #########
 
+#MannWhitney
+######
+
+
+getMannWhit <- function(cohort_df, p,updateProgress = NULL) {
+  if (is.function(updateProgress)) {
+    text <- "Performing MannWhitney (This may take a while)"
+    updateProgress(detail = text)
+  }
+  
+  mannwhit_results <-  cohort_df %>%
+    
+    
+    #Run the T-test and adjustments
+    group_by(Protein) %>%
+    wilcox_test(Intensity ~ Cohort, detailed = T) %>%
+    adjust_pvalue(method = "BH") %>%
+    
+    #Split the Protein name in Uniprot and Gene
+    separate(Protein, sep = '\\|', c("SP", "Protein.ID", "Gene", "Peptide"))  %>%
+    
+    #Determine Fold change. Since we work with log-transformed values we can just substract
+    mutate(FC = estimate) %>%
+    
+    #Create log10 p-vals
+    mutate(log10adjustP = -1 * log10(p.adj)) %>%
+    
+    #Determine if up or down regulated
+    mutate(Direction = ifelse(p.adj > p, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
+  
+  
+  
+  mannwhit_results <-
+    cbind(mannwhit_results,
+          start_seq = NA,
+          end_seq = NA)
+  
+  if (is.function(updateProgress)) {
+    text <- "MannWhit Complete"
+    updateProgress(detail = text)
+  }
+  
+  return(as.data.frame(mannwhit_results))
+}
 
 
 
 
 
+######
 
+
+#Locate Peptides
+#######
 locatePeptides <- function(df,
                            updateProgress = NULL) {
   if (is.function(updateProgress)) {
@@ -335,12 +450,14 @@ locatePeptides <- function(df,
   return(df)
   
 }
-
+#######
 
 
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 30 * 1024 ^ 3)
+  #Reactive Variables
+  #######
   
   fastaR <- reactiveVal()
   files <- reactiveVal()
@@ -359,7 +476,14 @@ server <- function(input, output, session) {
   filtered_results <- reactiveVal()
   plot_fasta <- reactiveVal()
   cohort_name <- reactiveVal()
+  parametric <- reactiveVal()
+  ctr_name <- reactiveVal()
+  final_dataframe <- reactiveVal()
+  removed_proteins <- reactiveVal()
+  y_axis <- reactiveVal()
+  p_cutoff <- reactiveVal()
   
+  #######
   #Fasta Input
   #######
   
@@ -418,7 +542,6 @@ server <- function(input, output, session) {
   
   #######
   
-  
   #File Input
   ######
   
@@ -445,7 +568,7 @@ server <- function(input, output, session) {
     "txt"
     
     req(input$confirmFasta)
-    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c("None" = 1,"Max" = 0)))
+    tagList(radioButtons("lfqInput", "Select LFQ Type: ", c("None" = 1, "Max" = 0)))
   })
   
   output$intensityInput <- renderUI({
@@ -463,6 +586,18 @@ server <- function(input, output, session) {
     ))
   })
   
+  output$parametricInput <- renderUI({
+    "txt"
+    
+    req(input$confirmFasta)
+    tagList(radioButtons(
+      "parametricInput",
+      "Select Parametric or Nonparametric: ",
+      c("Parametric" = 1, "Nonparametric" = 0)
+    ))
+  })
+  
+
   output$cutoffInput <- renderUI({
     "txt"
     req(input$confirmFasta)
@@ -470,6 +605,30 @@ server <- function(input, output, session) {
       "cutoffInput",
       "Select Cutoff : ",
       99,
+      min = 0,
+      max = 100
+    ))
+  })
+  
+  output$pInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
+    tagList(numericInput(
+      "pInput",
+      "Select p value for signifcance : ",
+      0.005,
+      min = 0,
+      max = 100
+    ))
+  })
+  
+  output$yInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
+    tagList(numericInput(
+      "yInput",
+      "Select Y-Axis (Will be used for both upregulation and downregulation) : ",
+      2.5,
       min = 0,
       max = 100
     ))
@@ -484,24 +643,41 @@ server <- function(input, output, session) {
     )))
   })
   
-  
-  output$cohortInput <- renderUI({
+  output$ctrInput <- renderUI({
     "txt"
     req(input$confirmFasta)
     
     tagList(
       textInput(
-        "cohortInput",
-        "Input cohort identifiers seperated by commas (,). [These should be in the filename for the Fragger search]",
+        "ctrInput",
+        "Input control identifiers seperated by commas",
         placeholder = "Example CTR, AD, DLB etc."
       ),
       value = NULL
+      
+    )
+  })
+  
+  output$cohortInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
+    
+
+      tagList(
+        textInput(
+          "cohortInput",
+          "Input cohort identifiers seperated by commas (,). [These should be the file names of the combined_petide.tsv]",
+          placeholder = "Example AD, DLB etc."
+        ),
+        value = NULL
     )
   })
   
   
-  ######
+  #######
   
+  #File Observe
+  ########
   observeEvent(input$fileInput, {
     files <- input$fileInput
     df <- list()
@@ -509,7 +685,7 @@ server <- function(input, output, session) {
       df[[i]] <-
         as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
       
-      df[[i]]$fileName <- str_sub(files$name[i], end = -5)
+      df[[i]]$File <- str_sub(files$name[i], end = -5)
       
       
       
@@ -529,11 +705,41 @@ server <- function(input, output, session) {
     
     
   })
+  observeEvent(input$parametricInput, {
+    parametric(input$parametricInput)
+    
+  })
+  # observeEvent(input$testInput, {
+  #   test(input$testInput)
+  #
+  # })
+  
   observeEvent(input$cutoffInput, {
     cutoff(input$cutoffInput)
     
   })
   
+  
+  observeEvent(input$yInput, {
+    y_axis(input$yInput)
+    
+  })
+  
+  observeEvent(input$pInput, {
+    p_cutoff(input$pInput)
+    
+  })
+  
+  observeEvent(input$ctrInput, {
+    nameTemp <- input$ctrInput
+    # nameTemp <- strsplit(nameTemp, ", |,| , ")
+    ctr_name(unlist(nameTemp))
+    
+    # if (!is.null(input$fileInput))
+    #   shinyjs::enable("confirmFile")
+    
+    
+  })
   
   observeEvent(input$cohortInput, {
     nameTemp <- input$cohortInput
@@ -547,13 +753,13 @@ server <- function(input, output, session) {
   })
   
   
+
+  ########
   
   
   
   
-  
-  ###### end file screen ######
-  
+
   
   observeEvent(input$confirmFile, {
     #UI LOGIC
@@ -564,7 +770,10 @@ server <- function(input, output, session) {
     shinyjs::hide("cutoffInput")
     shinyjs::hide("intensityInput")
     shinyjs::hide("cohortInput")
-    shinyjs::hide("cohortNInput")
+    shinyjs::hide("ctrInput")
+    shinyjs::hide("parametricInput")
+    shinyjs::hide("pInput")
+    shinyjs::hide("yInput")
     #######
     
     
@@ -591,6 +800,8 @@ server <- function(input, output, session) {
     protein_plot <- list()
     colnames(uniprot_ids)  <- c("Protein.ID")
     cohorts <- cohort_name()
+    parametric_type <- parametric()
+    ctr <- ctr_name()
     
     fasta <- as.data.frame(fastaR())
     fasta <- tibble::rownames_to_column(fasta, "accession")
@@ -599,9 +810,11 @@ server <- function(input, output, session) {
     
     df <- files()
     #######
+ 
+    #Dateframe creation
+    #######
     
     for (i in df) {
-      
       temp <-
         cleanData(
           i,
@@ -611,101 +824,194 @@ server <- function(input, output, session) {
           updateProgress
         )
       
+      temp <- cohortSplit(temp,ctr,updateProgress)
+      
       combined_cutoff_df <- rbind(combined_cutoff_df, temp)
+    }
+    
+    if(length(cohorts) < 2){
+    combined_cutoff_df_possible <-
+      combined_cutoff_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get(
+        .env$ctr
+      ))),
+      cohort1 = sum(!is.na(get(
+        .env$cohorts[1]
+      )))) %>%
+      mutate(possible = ifelse(ctr < 2 |
+                                 cohort1 < 2, FALSE, TRUE)) %>%
+      filter(possible)
+    }
+    else{
+      combined_cutoff_df_possible <-
+        combined_cutoff_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get(
+          .env$ctr
+        ))),
+        cohort1 = sum(!is.na(get(
+          .env$cohorts[1]
+        ))),
+        cohort2 = sum(!is.na(get(
+          .env$cohorts[2]
+        )))
+        ) %>%
+        mutate(possible = ifelse(ctr < 2 |
+                                   cohort1 < 2 | cohort2 < 2, FALSE, TRUE)) %>%
+        filter(possible)
+    }
+    
+    cohort_df <-
+      combined_cutoff_df %>% filter(Protein %in% combined_cutoff_df_possible$Protein)
+    
+    
+    if (nrow(cohort_df) < 1) {
+      session$close()
+      
+    }
+    ########
+    
+    #Nonparametric
+    #####
+    if (parametric_type == 0 & length(cohorts) == 1) {
+   
+      
+
+      
+      statisical_test <- getMannWhit(cohort_df, p_cutoff(), updateProgress)
+      
       
     }
     
-    browser()
-     
-    cohort_df <-
-      cohortSplit(combined_cutoff_df, cohorts, updateProgress)
     
-    ttest_results <- getTtest(cohort_df, updateProgress)
+    else if (parametric_type == 0) {
+  
+      
+      
+      statisical_test <- getKruskal(cohort_df,updateProgress())
+      
+    }
     
-    leftovers <- anti_join(ttest_results, fasta, by = "Protein.ID")
+    #####
     
-    ttest_results %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
+    #Parametric
+    #######
     
-    located_peptides(locatePeptides(ttest_results, updateProgress))
     
+    else{
+
+      
+      if (length(cohorts) > 1) {
+       
+        
+        
+        statisical_test <- getANOVA(cohort_df, updateProgress)
+        
+        
+      }
+      else{
+       
+        
+        statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
+        
+        
+      }
+      
+    }
+    
+    ########
+    
+    
+    
+    
+    
+    
+    
+    
+
+    leftovers <-
+      anti_join(statisical_test, fasta, by = "Protein.ID")
+    
+    statisical_test %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
+    
+    located_peptides(locatePeptides(statisical_test, updateProgress))
+
     
     #Plotting loop
     #######
-    for (i in unique(uniprot_ids$Protein.ID)) {
-      plotting_protein(filter(located_peptides(), Protein.ID == i))
-      filtered_results(filter(located_peptides(), Protein.ID == i))
-      filtered_results(inner_join(
-        fasta,
-        plotting_protein(),
-        by  = c('Protein.ID', 'x'),
-        multiple = "all"
-      ))
-      
-      
-      protein_length <- unique(nchar(filtered_results()$x))
-      
-      
-      protein_plot[[i]] = plotting_protein() %>%
+    if (nrow(uniprot_ids) == 0) {
+      for (i in unique(statisical_test$Protein.ID)) {
+        plotting_protein(filter(located_peptides(), Protein.ID == i))
+        filtered_results(filter(located_peptides(), Protein.ID == i))
+        filtered_results(inner_join(
+          fasta,
+          plotting_protein(),
+          by  = c('Protein.ID', 'x'),
+          multiple = "all"
+        ))
         
-        #Lets make a column based on significance
-        mutate(isSignificant = ifelse(filtered_results()$p.adj < 0.05, "yes", "no")) %>%
         
-        #Start plotting
-        ggplot() +
+        protein_length <- unique(nchar(filtered_results()$x))
         
-        #We take here the 'mean' but this is of course X-times the same value
-        #ylim(-2.5, 2.5)
-        xlim(1, protein_length) +
         
-        #Create some lines to help visualise the start and end of the protein.
-        geom_vline(xintercept = 1,
-                   lwd = 2,
-                   alpha = .5) +
-        geom_vline(xintercept = protein_length,
-                   lwd = 2,
-                   alpha = 0.5) +
-        
-        #set a horizontal line to inform about FC = 0
-        geom_hline(yintercept = 0, color = "black") +
-        
-        #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
-        geom_rect(
-          inherit.aes = FALSE,
-          aes(
-            xmin = plotting_protein()$start_seq,
-            xmax = (
-              plotting_protein()$start_seq + (
-                plotting_protein()$end_seq - plotting_protein()$start_seq
-              )
-            ),
-            ymin = filtered_results()$FC - 0.05,
-            ymax = filtered_results()$FC + 0.05,
-            fill = isSignificant
-          ),
+        protein_plot[[i]] = plotting_protein() %>%
           
-          #Here I specify some stuff that will be universal for all blocks irrespective of column info.
-          col = "black",
-          alpha = 0.75,
-        ) +
+          #Lets make a column based on significance
+          mutate(isSignificant = ifelse(filtered_results()$p.adj < 0.05, "yes", "no")) %>%
+          
+          #Start plotting
+          ggplot() +
+          
+          #We take here the 'mean' but this is of course X-times the same value
+          ylim(-y_axis(), y_axis()) +
+          xlim(1, protein_length) +
+          
+          #Create some lines to help visualise the start and end of the protein.
+          geom_vline(xintercept = 1,
+                     lwd = 2,
+                     alpha = .5) +
+          geom_vline(xintercept = protein_length,
+                     lwd = 2,
+                     alpha = 0.5) +
+          
+          #set a horizontal line to inform about FC = 0
+          geom_hline(yintercept = 0, color = "black") +
+          
+          #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
+          geom_rect(
+            inherit.aes = FALSE,
+            aes(
+              xmin = plotting_protein()$start_seq,
+              xmax = (
+                plotting_protein()$start_seq + (
+                  plotting_protein()$end_seq - plotting_protein()$start_seq
+                )
+              ),
+              ymin = filtered_results()$FC - 0.05,
+              ymax = filtered_results()$FC + 0.05,
+              fill = isSignificant
+            ),
+            
+            #Here I specify some stuff that will be universal for all blocks irrespective of column info.
+            col = "black",
+            alpha = 0.75,
+          ) +
+          
+          #Set the Ggplot theme, limit the y-axis for FC.
+          theme_bw() +
+          
+          #Specify the colours I want to use for the isSignificant column
+          scale_fill_manual(values = c("yes" = "red", "no" = "grey")) +
+          theme(legend.position = "bottom") +
+          
+          #x and yaxis titles
+          xlab("Protein Sequence") +
+          ylab("FC") +
+          
+          labs(title = as.character(i))
         
-        #Set the Ggplot theme, limit the y-axis for FC.
-        theme_bw() +
-        ylim(-2, 2) +
         
-        #Specify the colours I want to use for the isSignificant column
-        scale_fill_manual(values = c("yes" = "red", "no" = "grey")) +
-        theme(legend.position = "bottom") +
         
-        #x and yaxis titles
-        xlab("Protein Sequence") +
-        ylab("FC") +
         
-        labs(title = as.character(i))
-      
-      
-      
-      
-      
+        
+      }
     }
     ######
     
@@ -714,7 +1020,16 @@ server <- function(input, output, session) {
     ######
     protein_plotr(protein_plot)
     plot_fasta(fasta)
-    protein_ids(uniprot_ids)
+    if (nrow(uniprot_ids) == 0) {
+      temp_id <- as.data.frame(unique(statisical_test$Protein.ID))
+      colnames(temp_id) <- c("Protein.ID")
+      protein_ids(temp_id)
+    }
+    else{
+      protein_ids(uniprot_ids)
+    }
+    final_dataframe(statisical_test)
+    removed_proteins(leftovers)
     ######
     
     
@@ -737,11 +1052,9 @@ server <- function(input, output, session) {
     content = function(file) {
       owd <- setwd(tempdir())
       on.exit(setwd(owd))
+
       
       
-      
-      
-      browser()
       
       plots <- as.list(protein_plotr())
       
@@ -765,8 +1078,17 @@ server <- function(input, output, session) {
         }
       }
       
-      zip_files <- list.files(path = getwd(), pattern = ".png$")
+      write.csv(final_dataframe()
+                , file = "final_dataframe.csv"
+                , row.names=F
+      )
+      write.csv(removed_proteins()
+                , file = "removed_proteins.csv"
+                , row.names=F
+      )
       
+      zip_files <- list.files(path = getwd(), pattern = ".png$|.csv$")
+  
       zip::zip(file, files = zip_files)
       
       
@@ -780,7 +1102,7 @@ server <- function(input, output, session) {
   observeEvent(input$clickThrough, {
     plots <- as.list(protein_plotr())
     ids <- as.data.frame(protein_ids())
-    if (j() < nrow(as.data.frame(uniprot()))) {
+    if (j() < nrow(ids)) {
       output$plot <- renderUI({
         i <-  unique(ids[j(), 'Protein.ID'])
         
