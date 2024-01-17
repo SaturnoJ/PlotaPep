@@ -18,11 +18,11 @@ ui <- dashboardPage(
         uiOutput("intensityInput"),
         uiOutput("lfqInput"),
         uiOutput("cutoffInput"),
-        uiOutput("fileTypeInput"),
         uiOutput("uniprotInput"),
         uiOutput("ctrInput"),
         uiOutput("cohortInput"),
         uiOutput("parametricInput"),
+        uiOutput("comparativeInput"),
         uiOutput("yInput"),
         uiOutput("pInput"),
         
