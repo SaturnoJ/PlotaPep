@@ -15,6 +15,7 @@ library("rstatix")
 library(data.table)
 library(magrittr)
 library(shinydisconnect)
+library("colorspace")
 
 # clean the data
 #################
@@ -41,7 +42,6 @@ cleanData <-
     
     outlier_removed_df <- removeOutlier(cleaned_df)
     
-    
     # combined_cutoff_df <- outlier_removed_df %>%
     #   mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
     #   group_by(Protein) %>%
@@ -49,11 +49,8 @@ cleanData <-
     #   mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
     #   filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
     #   dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
-    #
-    #
-    # combined_cutoff_df$File <- file
-    #
-    #
+    #   combined_cutoff_df$File <- file
+    
     
     
     outlier_removed_df$File <- file
@@ -85,7 +82,9 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"),-contains("Total"),-contains("Unique"))
+                      contains("Intensity"),
+                      -contains("Total"),
+                      -contains("Unique"))
       removeSubString <- paste0(" ", "Intensity")
     } else if (intensity == 1) {
       df <-
@@ -105,11 +104,11 @@ fraggerCleaner <-
       df <-
         dplyr::select(df,
                       Protein,
-                      contains("Intensity"),-contains("MaxLFQ"))
+                      contains("Intensity"), -contains("MaxLFQ"))
     }
     
     #col to rowname
-    df <- data.frame(df[, -1], row.names = df[, 1])
+    df <- data.frame(df[,-1], row.names = df[, 1])
     
     
     #Get rid of substring part we do not need
@@ -117,10 +116,8 @@ fraggerCleaner <-
     colnames(df) <-
       stringr::str_remove(colnames(df), removeSubString)
     
-    
     #transpose, remove zeros, log2
     df_transposed <-  data.frame(t(df))
-    
     rownames(df_transposed) <- colnames(df)
     colnames(df_transposed) <- rownames(df)
     df <- df_transposed
@@ -162,14 +159,14 @@ removeOutlier <- function(df) {
     ungroup() %>%
     distinct(Sample, .keep_all = T)
   
-  sample_correlations <- sample_correlations %>%
-    dplyr::mutate(Outlier = SampleCor < (1 - 1 * sd(
+  sample_correlations_outlier <- sample_correlations %>%
+    dplyr::mutate(Outlier = SampleCor < (1 - 2 * sd(
       unique(sample_correlations$SampleCor), na.rm = T
     )))
   
   #Make the DF that we will return (i.e. without outliers)
   returndf <- df %>%
-    dplyr::filter(Sample %in% dplyr::filter(sample_correlations, Outlier == F)$Sample) %>%
+    dplyr::filter(Sample %in% dplyr::filter(sample_correlations_outlier, Outlier == F)$Sample) %>%
     dplyr::select(Protein, Sample, Intensity)
   
   return(returndf)
@@ -194,7 +191,7 @@ cohortSplit <-
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
-    br
+    
     
     cohort_df <- data.frame()
     
@@ -611,7 +608,7 @@ server <- function(input, output, session) {
       radioButtons(
         "comparativeInput",
         "Select Comparative TTest Results (Plotting multiple Ttest results to one plot): ",
-        c("Comparative" = 1, "Noncomparative" = 0)
+        c("Noncomparative" = 0, "Comparative" = 1)
       )
     )
   })
@@ -818,7 +815,6 @@ server <- function(input, output, session) {
       progress$set(value = value, detail = detail)
     }
     #######
-    
     #Variable Declaration
     #######
     combined_cutoff_df <- data.frame()
@@ -889,7 +885,6 @@ server <- function(input, output, session) {
       cohort_df <-
         combined_cutoff_df %>% filter(Protein %in% combined_cutoff_df_possible$Protein)
       
-      
       if (nrow(cohort_df) < 1) {
         session$close()
         
@@ -938,7 +933,6 @@ server <- function(input, output, session) {
     
     #Comparative
     #########
-    browser()
     for (i in df) {
       temp <-
         cleanData(
@@ -987,9 +981,6 @@ server <- function(input, output, session) {
     }
     
     
-    
-    
-    
     ######
     
     
@@ -1000,17 +991,15 @@ server <- function(input, output, session) {
       statisical_test %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID)
       
       located_peptides(locatePeptides(statisical_test, updateProgress))
-      # browser()
-      
       #Plotting loop
       #######
       if (nrow(uniprot_ids) > 0) {
         protein_id_loop <- uniprot_ids
-        
       }
       else{
-        protein_id_loop <-  unique(comparative_combined$Protein.ID)
+        protein_id_loop <-  unique(statisical_test$Protein.ID)
       }
+      browser()
       for (i in protein_id_loop) {
         plotting_protein(filter(located_peptides(), Protein.ID == i))
         filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -1020,9 +1009,7 @@ server <- function(input, output, session) {
           by  = c('Protein.ID', 'x'),
           multiple = "all"
         ))
-        
         protein_length <- unique(nchar(filtered_results()$x))
-        
         
         protein_plot[[i]] = plotting_protein() %>%
           
@@ -1037,10 +1024,10 @@ server <- function(input, output, session) {
           xlim(1, protein_length) +
           
           #Create some lines to help visualise the start and end of the protein.
-          geom_vline(xintercept = 1,
+          geom_vline(xintercept = 0,
                      lwd = 2,
                      alpha = .5) +
-          geom_vline(xintercept = protein_length,
+          geom_vline(xintercept = protein_length + 1,
                      lwd = 2,
                      alpha = 0.5) +
           
@@ -1077,15 +1064,9 @@ server <- function(input, output, session) {
           #x and yaxis titles
           xlab("Protein Sequence") +
           ylab("FC") +
-          labs(subtitle = as.character(i),
-               title = as.character(filtered_results()$Gene),) +
-          
-          annotate(
-            "text",
-            x = 15 ,
-            y = y_axis(),
-            label = paste0("p == ", p_cutoff()),
-            parse = TRUE
+          labs(
+            subtitle = paste0(as.character(i), " p == ", p_cutoff()),
+            title = as.character(filtered_results()$Gene)
           )
         
         
@@ -1100,9 +1081,9 @@ server <- function(input, output, session) {
       
       comparative_combined %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID) %>% mutate(
         color = case_when(
-          Cohort == as.character(cohorts[1]) ~  "red",
-          Cohort == as.character(cohorts[2]) ~ "orange",
-          Cohort == as.character(cohorts[3]) ~ "green"
+          Cohort == as.character(cohorts[1]) ~  "#61A9D9",
+          Cohort == as.character(cohorts[2]) ~ "#CE6BAF",
+          Cohort == as.character(cohorts[3]) ~ "#E6D152"
         )
       )
       
@@ -1145,13 +1126,13 @@ server <- function(input, output, session) {
           
           #We take here the 'mean' but this is of course X-times the same value
           ylim(-y_axis(), y_axis()) +
-          xlim(1, protein_length) +
+          xlim(0, protein_length+1) +
           
           #Create some lines to help visualise the start and end of the protein.
-          geom_vline(xintercept = 1,
+          geom_vline(xintercept = 0,
                      lwd = 2,
                      alpha = .5) +
-          geom_vline(xintercept = protein_length,
+          geom_vline(xintercept = protein_length + 1,
                      lwd = 2,
                      alpha = 0.5) +
           
@@ -1189,17 +1170,10 @@ server <- function(input, output, session) {
           xlab("Protein Sequence") +
           ylab("FC") +
           
-          labs(subtitle = as.character(i),
-               title = as.character(filtered_results()$Gene),) +
-          
-          annotate(
-            "text",
-            x = 10 ,
-            y = y_axis(),
-            label = paste0("p == ", p_cutoff()),
-            parse = TRUE
+          labs(
+            subtitle = paste0(as.character(i), " p == ", p_cutoff()),
+            title = as.character(filtered_results()$Gene)
           )
-        
         
         
         
@@ -1287,7 +1261,8 @@ server <- function(input, output, session) {
         list.files(path = getwd(), pattern = ".svg$|.csv$|.png$")
       
       zip::zip(file, files = zip_files)
-      
+      files_to_delete <- dir(path = getwd() , pattern = "*.png$")
+      file.remove(file.path(getwd(), files_to_delete))
       
     }
     
@@ -1301,7 +1276,7 @@ server <- function(input, output, session) {
     ids <- as.data.frame(protein_ids())
     if (j() < nrow(ids)) {
       output$plot <- renderUI({
-        i <-  unique(ids[j(), 'Protein.ID'])
+        i <-  unique(protein_ids()$Protein.ID)
         
         plotting_protein(filter(located_peptides(), Protein.ID == i))
         filtered_results(filter(located_peptides(), Protein.ID == i))
