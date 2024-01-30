@@ -40,7 +40,7 @@ cleanData <-
       updateProgress(detail = text)
     }
     
-    outlier_removed_df <- removeOutlier(cleaned_df)
+    # outlier_removed_df <- removeOutlier(cleaned_df)
     
     # combined_cutoff_df <- outlier_removed_df %>%
     #   mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
@@ -53,9 +53,9 @@ cleanData <-
     
     
     
-    outlier_removed_df$File <- file
+    cleaned_df$File <- file
     
-    return(as.data.frame(outlier_removed_df))
+    return(as.data.frame(cleaned_df))
   }
 
 
@@ -145,32 +145,7 @@ fraggerCleaner <-
   }
 
 
-removeOutlier <- function(df) {
-  #Determine correlations between sample and theoretical
-  sample_correlations <- df %>%
-    group_by(Protein) %>%
-    dplyr::mutate(medianProtein = median(Intensity, na.rm = T)) %>%
-    ungroup() %>%
-    group_by(Sample) %>%
-    dplyr::mutate(
-      SampleCor = stats::cor(Intensity, medianProtein, method = "pearson", use =
-                               "pairwise.complete.obs")
-    ) %>%
-    ungroup() %>%
-    distinct(Sample, .keep_all = T)
-  
-  sample_correlations_outlier <- sample_correlations %>%
-    dplyr::mutate(Outlier = SampleCor < (1 - 2 * sd(
-      unique(sample_correlations$SampleCor), na.rm = T
-    )))
-  
-  #Make the DF that we will return (i.e. without outliers)
-  returndf <- df %>%
-    dplyr::filter(Sample %in% dplyr::filter(sample_correlations_outlier, Outlier == F)$Sample) %>%
-    dplyr::select(Protein, Sample, Intensity)
-  
-  return(returndf)
-}
+
 
 removeZero <- function(df) {
   for (j in seq_len(ncol(df))) {
@@ -185,7 +160,7 @@ removeZero <- function(df) {
 ########
 cohortSplit <-
   function(combined_cutoff_df,
-           ctr,
+           ctr, std,
            updateProgress = NULL) {
     if (is.function(updateProgress)) {
       text <- "Creating Cohorts"
@@ -194,9 +169,10 @@ cohortSplit <-
     
     
     cohort_df <- data.frame()
-    
     temp_ctr <- splitCtr(combined_cutoff_df, ctr)
+    temp_ctr <- removeOutlier(temp_ctr,std)
     temp_dx <- splitDisease(combined_cutoff_df, temp_ctr)
+    temp_dx <- removeOutlier(temp_dx,std)
     
     cohort_df <- rbind(temp_ctr, temp_dx)
     
@@ -211,7 +187,32 @@ cohortSplit <-
     
     return(as.data.frame(cohort_df))
   }
-
+removeOutlier <- function(df,std) {
+  #Determine correlations between sample and theoretical
+  sample_correlations <- df %>%
+    group_by(Protein) %>%
+    dplyr::mutate(medianProtein = median(Intensity, na.rm = T)) %>%
+    ungroup() %>%
+    group_by(Sample) %>%
+    dplyr::mutate(
+      SampleCor = stats::cor(Intensity, medianProtein, method = "pearson", use =
+                               "pairwise.complete.obs")
+    ) %>%
+    ungroup() %>%
+    distinct(Sample, .keep_all = T)
+  
+  sample_correlations_outlier <- sample_correlations %>%
+    dplyr::mutate(Outlier = SampleCor < (1 - std * sd(
+      unique(sample_correlations$SampleCor), na.rm = T
+    )))
+  
+  #Make the DF that we will return (i.e. without outliers)
+  returndf <- df %>%
+    dplyr::filter(Sample %in% dplyr::filter(sample_correlations_outlier, Outlier == F)$Sample) %>%
+    dplyr::select(Protein, Sample, Intensity,File,Cohort )
+  
+  return(returndf)
+}
 
 ##extracts the dx df from the merged df
 splitDisease <- function(df, ctr) {
@@ -485,6 +486,8 @@ server <- function(input, output, session) {
   p_cutoff <- reactiveVal()
   comparative <- reactiveVal()
   pal <- reactiveVal()
+  colors_reactive <- reactiveVal()
+  std <- reactiveVal()
   
   #######
   #Fasta Input
@@ -656,9 +659,9 @@ server <- function(input, output, session) {
   output$confirmFile <- renderUI({
     "txt"
     req(input$confirmFasta)
-    tagList(disabled(actionButton(
+    tagList(actionButton(
       "confirmFile", "Confirm File(s) Input"
-    )))
+    ))
   })
   
   output$ctrInput <- renderUI({
@@ -694,6 +697,33 @@ server <- function(input, output, session) {
   })
   
   
+  output$colorsInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
+    
+    tagList(
+      textInput(
+        "colorsInput",
+        "Input hex value color codes",
+        placeholder = "Example CTR, AD, DLB etc."
+      ),
+      value = NULL
+      
+    )
+  })
+  output$stdInput <- renderUI({
+    "txt"
+    req(input$confirmFasta)
+    tagList(
+      numericInput(
+        "stdInput",
+        "Select standad deviations : ",
+        2,
+        min = 2,
+        max = 6
+      )
+    )
+  })
   #######
   
   #File Observe
@@ -746,6 +776,11 @@ server <- function(input, output, session) {
     p_cutoff(input$pInput)
     
   })
+  observeEvent(input$stdInput, {
+    std(input$stdInput)
+    
+  })
+  
   
   observeEvent(input$comparativeInput, {
     comparative(input$comparativeInput)
@@ -753,9 +788,9 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$ctrInput, {
-    nameTemp <- input$ctrInput
-    # nameTemp <- strsplit(nameTemp, ", |,| , ")
-    ctr_name(unlist(nameTemp))
+    name_temp <- input$ctrInput
+    # name_temp <- strsplit(name_temp, ", |,| , ")
+    ctr_name(unlist(name_temp))
     
     # if (!is.null(input$fileInput))
     #   shinyjs::enable("confirmFile")
@@ -764,12 +799,21 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$cohortInput, {
-    nameTemp <- input$cohortInput
-    nameTemp <- strsplit(nameTemp, ", |,| , ")
-    cohort_name(unlist(nameTemp))
+    name_temp <- input$cohortInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    cohort_name(unlist(name_temp))
     
-    if (!is.null(input$fileInput))
-      shinyjs::enable("confirmFile")
+  
+    
+    
+  })
+  
+  observeEvent(input$colorsInput, {
+    colors_temp <- input$colorsInput
+    colors_temp <- strsplit(colors_temp, ", |,| , ")
+    colors_reactive(unlist(colors_temp))
+    
+
     
     
   })
@@ -797,6 +841,8 @@ server <- function(input, output, session) {
     shinyjs::hide("pInput")
     shinyjs::hide("yInput")
     shinyjs::hide("comparativeInput")
+    shinyjs::hide("colorsInput")
+    shinyjs::hide("stdInput")
     #######
     
     
@@ -826,8 +872,8 @@ server <- function(input, output, session) {
     parametric_type <- parametric()
     ctr <- ctr_name()
     protein_id_loop <- list
-    
-    
+    colors_df<- as.list(colors_reactive())
+    browser()
     fasta <- as.data.frame(fasta_reactive())
     fasta <- tibble::rownames_to_column(fasta, "accession")
     fasta %<>%
@@ -836,7 +882,6 @@ server <- function(input, output, session) {
     
     df <- files()
     #######
-    
     #Dateframe creation
     #######
     if (comparative() == 0) {
@@ -847,10 +892,11 @@ server <- function(input, output, session) {
             as.integer(intensity()),
             as.integer(lfq()),
             as.integer(cutoff()),
+            
             updateProgress
           )
         
-        temp <- cohortSplit(temp, ctr, updateProgress)
+        temp <- cohortSplit(temp, ctr,as.integer(std()), updateProgress)
         
         combined_cutoff_df <- rbind(combined_cutoff_df, temp)
       }
@@ -943,7 +989,7 @@ server <- function(input, output, session) {
           updateProgress
         )
       
-      temp <- cohortSplit(temp, ctr, updateProgress)
+      temp <- cohortSplit(temp, ctr, as.integer(std()),updateProgress)
       
       
       for (i in cohorts) {
@@ -956,8 +1002,7 @@ server <- function(input, output, session) {
             filter(possible)
         }
       }
-      
-      
+
       cohort_df <-
         temp %>% filter(Protein %in% combined_cutoff_df_possible$Protein)
       
@@ -999,7 +1044,6 @@ server <- function(input, output, session) {
       else{
         protein_id_loop <-  unique(statisical_test$Protein.ID)
       }
-      browser()
       for (i in protein_id_loop) {
         plotting_protein(filter(located_peptides(), Protein.ID == i))
         filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -1065,7 +1109,7 @@ server <- function(input, output, session) {
           xlab("Protein Sequence") +
           ylab("FC") +
           labs(
-            subtitle = paste0(as.character(i), " p == ", p_cutoff()),
+            subtitle = paste0(as.character(i), " p == ", p_cutoff(), " standard deviations ==", std()),
             title = as.character(filtered_results()$Gene)
           )
         
@@ -1076,25 +1120,24 @@ server <- function(input, output, session) {
     }
     ######
     else{
+
       leftovers <-
         anti_join(comparative_combined, fasta, by = "Protein.ID")
-      
       comparative_combined %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID) %>% mutate(
-        color = case_when(
-          Cohort == as.character(cohorts[1]) ~  "#61A9D9",
-          Cohort == as.character(cohorts[2]) ~ "#CE6BAF",
-          Cohort == as.character(cohorts[3]) ~ "#E6D152"
-        )
+        colors = case_when(
+          Cohort == as.character(cohorts[1]) ~  as.character(colors_df[1]),
+          Cohort == as.character(cohorts[2]) ~ as.character(colors_df[2]),
+          Cohort == as.character(cohorts[3]) ~ as.character(colors_df[3])        )
       )
       
-      # cols <- c(as.character(cohorts[1]) = "red", as.character(cohorts[2]) = "blue", as.character(cohorts[1]) = "green")
-      
+
       located_peptides(locatePeptides(comparative_combined, updateProgress))
-      # browser()
-      colors <- distinct(comparative_combined, Cohort, color)
+      colors <- distinct(comparative_combined, Cohort, colors)
       pal_temp <- colors$color
       names(pal_temp) <- colors$Cohort
       pal(pal_temp)
+      
+
       #Plotting loop
       #######
       if (nrow(uniprot_ids) > 0) {
@@ -1171,7 +1214,7 @@ server <- function(input, output, session) {
           ylab("FC") +
           
           labs(
-            subtitle = paste0(as.character(i), " p == ", p_cutoff()),
+            subtitle = paste0(as.character(i), " p == ", p_cutoff(), " standard deviations ==", std()),
             title = as.character(filtered_results()$Gene)
           )
         
@@ -1276,7 +1319,7 @@ server <- function(input, output, session) {
     ids <- as.data.frame(protein_ids())
     if (j() < nrow(ids)) {
       output$plot <- renderUI({
-        i <-  unique(protein_ids()$Protein.ID)
+        i <-  unique(ids[j(), 'Protein.ID'])
         
         plotting_protein(filter(located_peptides(), Protein.ID == i))
         filtered_results(filter(located_peptides(), Protein.ID == i))

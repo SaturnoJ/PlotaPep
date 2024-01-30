@@ -25,6 +25,8 @@ ui <- dashboardPage(
         uiOutput("comparativeInput"),
         uiOutput("yInput"),
         uiOutput("pInput"),
+        uiOutput("colorsInput"),
+        uiOutput("stdInput"),
         
         disabled(actionButton("confirmFasta", "Confirm FASTA Input")),
         
