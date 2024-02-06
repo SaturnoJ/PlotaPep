@@ -5,9 +5,10 @@ account: Jason.Saturno@childrens.harvard.edu
 server: rc-rstudio-prod.chboston.org
 hostUrl: https://rc-rstudio-prod.chboston.org/__api__
 appId: 94
-bundleId: 889
+bundleId: 942
 url: https://rc-rstudio-prod.chboston.org/content/322c056e-b1da-4929-afb6-cb6bd4f38644/
-when: 1703016704.93972
-lastSyncTime: 1703016704.93972
+when: 1706624973.89189
+lastSyncTime: 1706624973.89189
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: README.md
