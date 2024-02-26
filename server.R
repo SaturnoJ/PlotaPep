@@ -120,7 +120,7 @@ fraggerCleaner <-
     df <- df_transposed
 
     df <- removeZero(df)
-    # df <- log2(df)
+    #df <- log2(df)
     
     
     
@@ -157,23 +157,22 @@ removeZero <- function(df) {
 cohortSplit <-
   function(combined_cutoff_df,
            ctr,
+           cohort,
            std,
            updateProgress = NULL) {
     if (is.function(updateProgress)) {
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
-    
-    
     cohort_df <- data.frame()
     temp_ctr <- splitCtr(combined_cutoff_df, ctr)
     temp_ctr <- removeOutlier(temp_ctr, std)
-    temp_dx <- splitDisease(combined_cutoff_df, temp_ctr)
+    temp_dx <- splitDisease(combined_cutoff_df,cohort)
     temp_dx <- removeOutlier(temp_dx, std)
     
     cohort_df <- rbind(temp_ctr, temp_dx)
     
-    
+
     
     
     
@@ -212,9 +211,12 @@ removeOutlier <- function(df, std) {
 }
 
 ##extracts the dx df from the merged df
-splitDisease <- function(df, ctr) {
-  df <- anti_join(df, ctr, by = "Sample")
-  df$Cohort <- df$File[1]
+splitDisease <- function(df,cohort) {
+  df <-
+    subset(df,
+           grepl(paste(cohort, collapse = "|"), df$Sample))
+  
+  df$Cohort <- cohort
   
   if (nrow(df) < 0) {
     return(NULL)
@@ -224,10 +226,11 @@ splitDisease <- function(df, ctr) {
 }
 
 ##extracts the control df from the merged df
-splitCtr <- function(combined_cutoff_df, cohort) {
+splitCtr <- function(df, cohort) {
   df <-
-    subset(combined_cutoff_df,
-           grepl(paste(cohort, collapse = "|"), combined_cutoff_df$Sample))
+    subset(df,
+           grepl(paste(cohort, collapse = "|"), df$Sample))
+  
   df$Cohort <- "CTR"
   
   if (nrow(df) < 0) {
@@ -498,7 +501,7 @@ server <- function(input, output, session) {
   colors_reactive <- reactiveVal()
   std <- reactiveVal()
   svg <- reactiveVal()
-  
+  less_than <- reactiveVal()
   #######
   #Fasta Input
   #######
@@ -902,6 +905,7 @@ server <- function(input, output, session) {
     #Dateframe creation
     #######
     if (comparative() == 0) {
+
       for (i in df) {
         temp <-
           cleanData(
@@ -912,9 +916,8 @@ server <- function(input, output, session) {
             
             updateProgress
           )
-        
         temp <-
-          cohortSplit(temp, ctr, as.integer(std()), updateProgress)
+          cohortSplit(temp, ctr, cohorts, as.integer(std()), updateProgress)
         
         combined_cutoff_df <- rbind(combined_cutoff_df, temp)
       }
@@ -1000,7 +1003,7 @@ server <- function(input, output, session) {
       
     }
     
-    
+    else{
     
     #Comparative
     #########
@@ -1033,6 +1036,7 @@ server <- function(input, output, session) {
         temp %>% filter(Protein %in% combined_cutoff_df_possible$Protein)
       
       cohort_df$Intensity <- log2(cohort_df$Intensity)
+
       
       if (parametric_type == 0) {
         statisical_test <-
@@ -1056,9 +1060,8 @@ server <- function(input, output, session) {
       text <- "Removing Outliers"
       updateProgress(detail = text)
     }
-    
-
-    
+    }
+    browser()
     #Plotting loop
     ######
     if (comparative() == 0) {
@@ -1084,11 +1087,11 @@ server <- function(input, output, session) {
         filtered_results(inner_join(
           fasta,
           plotting_protein(),
-          by  = c('Protein.ID', 'x'),
+          by  = c('Protein.ID', 'x', 'Gene', 'info'),
           multiple = "all"
         ))
         protein_length <- unique(nchar(filtered_results()$x))
-        
+
         protein_plot[[i]] = plotting_protein() %>%
           
           #Lets make a column based on significance
@@ -1250,7 +1253,7 @@ server <- function(input, output, session) {
           
           #Specify the colours I want to use for the isSignificant column
           scale_fill_manual(values = pal()) +
-          scale_color_manual(values = c("yes" = "black", "no" = "red")) +
+          scale_color_manual(values = c("yes" = "black")) +
           theme(legend.position = "bottom",
                 legend.key = element_rect(colour = "white")) +
           guides(fill = guide_legend(order = 1),
@@ -1299,6 +1302,7 @@ server <- function(input, output, session) {
       protein_ids(uniprot_ids)
     }
     removed_proteins(leftovers)
+    less_than(less_than_two)
     ######
     
     
@@ -1384,7 +1388,12 @@ server <- function(input, output, session) {
                 , row.names = F)
       write.csv(removed_proteins()
                 ,
-                file = "removed_proteins.csv"
+                file = "removed_proteins_fasta.csv"
+                ,
+                row.names = F)
+      write.csv(less_than()
+                ,
+                file = "removed_proteins_less_two.csv"
                 ,
                 row.names = F)
       
