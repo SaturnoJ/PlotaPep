@@ -17,6 +17,7 @@ ui <- dashboardPage(
         textOutput("test"),
         
         uiOutput("fileInput"),
+        uiOutput("file_typeInput"),
         uiOutput("intensityInput"),
         uiOutput("lfqInput"),
         uiOutput("cutoffInput"),
@@ -25,7 +26,7 @@ ui <- dashboardPage(
         uiOutput("cohortInput"),
         uiOutput("parametricInput"),
         uiOutput("comparativeInput"),
-        uiOutput("yInput"),
+        # uiOutput("yInput"),
         uiOutput("pInput"),
         uiOutput("colorsInput"),
         uiOutput("stdInput"),
@@ -103,12 +104,12 @@ ui <- dashboardPage(
       placement = "right",
       trigger = "hover"
     ),
-    bsTooltip(
-      id = "yInput",
-      title = "Height of the y-axis for the plots",
-      placement = "right",
-      trigger = "hover"
-    ),
+    # bsTooltip(
+    #   id = "yInput",
+    #   title = "Height of the y-axis for the plots",
+    #   placement = "right",
+    #   trigger = "hover"
+    # ),
     bsTooltip(
       id = "pInput",
       title = "Choose max p-value for statisical significance",
