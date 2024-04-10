@@ -1,14 +1,12 @@
-name: tally
-title:
+name: plotapep3
+title: PlotaPep
 username: Jason.Saturno@childrens.harvard.edu
 account: Jason.Saturno@childrens.harvard.edu
 server: rc-rstudio-prod.chboston.org
 hostUrl: https://rc-rstudio-prod.chboston.org/__api__
-appId: 94
-bundleId: 942
-url: https://rc-rstudio-prod.chboston.org/content/322c056e-b1da-4929-afb6-cb6bd4f38644/
-when: 1706624973.89189
-lastSyncTime: 1706624973.89189
+appId: 129
+bundleId:
+url: https://rc-rstudio-prod.chboston.org/content/229d756a-98a1-4b58-8df0-01495c0348dd/
+version: 1
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: README.md
