@@ -1,7 +1,5 @@
-# Tally
-
-name is subject to change.
-Tally is a proteolytic cleavage analysis tool. Tally takes in matched spectra from CSV files and determines what specific peptide cleavages occured in that spectra analysis.
+# PlotaPeP
+For use with MSfragger peptide outputs. Upload a fasta files with proteins you wish to plot, upload fragger data, identify cohorts as labled in fragger out put, select colors, std, modifications, run.
 
 ## Installation
 
@@ -13,8 +11,10 @@ Uses Biostrings, tidyverse, and org.Hs.eg.db R packages.
     BiocManager::install("Biostrings")
     BiocManager::install("org.Hs.eg.db")
     install.packages("tidyverse")
-library("Biostrings")
-library("org.Hs.eg.db")
-library("tidyverse")
+    install.packages("shiny")
+install.packages("shinyBS")
+install.packages("shinydisconnect")
+install.packages("shinyjs")
+install.packages("shinydashboard")
 
 ```
