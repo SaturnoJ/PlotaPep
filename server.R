@@ -59,57 +59,36 @@ server <- function(input, output, session) {
   #Fasta Input
   #######
   
-  output$fastaInput <- renderUI({
-    "txt"
-    tagList(
-      fileInput(
-        "fastaInput",
-        "Choose FASTA file : ",
-        multiple = FALSE,
-        accept = c("fasta", ".FASTA", "FASTA", ".fasta"),
-        # close c
-        buttonLabel = "Browse...",
-        placeholder = "No FASTA Selected"
-      )
-    )
-  })
+  # output$fastaInput <- renderUI({
+  #   "txt"
+  #   tagList(
+  #
+  #   )
+  # })
   
   
   
   
-  output$uniprotInput <- renderUI({
-    "txt"
-    
-    tagList(
-      textInput(
-        "uniprotInput",
-        "Input Uniprot IDs separated by commas (,) : ",
-        placeholder = "Example P05067, P02649, etc."
-      ),
-      value = NULL
-    )
-  })
+  # output$uniprotInput <- renderUI({
+  #   "txt"
+  #
+  #
+  # })
   
   
   observeEvent(input$fastaInput, {
     fasta_reactive(readAAStringSet(input$fastaInput$datapath))
-    observeEvent(input$uniprotInput, {
-      uniprotTemp <- input$uniprotInput
-      uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
-      uniprot(uniprotTemp)
-      
-    })
-    shinyjs::enable("confirmFasta")
+    
+    
     
   })
   
-  observeEvent(input$confirmFasta, {
-    shinyjs::hide("fastaInput")
-    shinyjs::hide("confirmFasta")
-    shinyjs::hide("uniprotInput")
-    
-  })
   
+  observeEvent(input$uniprotInput, {
+    uniprotTemp <- input$uniprotInput
+    uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
+    uniprot(uniprotTemp)
+  })
   
   
   #######
@@ -119,7 +98,7 @@ server <- function(input, output, session) {
   
   output$fileInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     tagList(
       fileInput(
         "fileInput",
@@ -139,7 +118,7 @@ server <- function(input, output, session) {
   output$file_typeInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(radioButtons(
       "file_typeInput",
       "Select MSFragger Output Type : ",
@@ -150,14 +129,14 @@ server <- function(input, output, session) {
   output$lfqInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(radioButtons("lfqInput", "Select LFQ Type : ", c("None" = 1, "Max" = 0)))
   })
   
   output$intensityInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(radioButtons(
       "intensityInput",
       "Select Intensity : ",
@@ -172,7 +151,7 @@ server <- function(input, output, session) {
   output$parametricInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(
       radioButtons(
         "parametricInput",
@@ -184,7 +163,7 @@ server <- function(input, output, session) {
   output$svgInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(radioButtons(
       "svgInput",
       "Select .SVG or .PNG file formats : ",
@@ -195,7 +174,7 @@ server <- function(input, output, session) {
   output$comparativeInput <- renderUI({
     "txt"
     
-    req(input$confirmFasta)
+    
     tagList(
       radioButtons(
         "comparativeInput",
@@ -208,7 +187,7 @@ server <- function(input, output, session) {
   
   output$cutoffInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     tagList(numericInput(
       "cutoffInput",
       "Select Cutoff : ",
@@ -220,7 +199,7 @@ server <- function(input, output, session) {
   
   output$pInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     tagList(numericInput(
       "pInput",
       "Select p value for significance : ",
@@ -232,7 +211,7 @@ server <- function(input, output, session) {
   
   # output$yInput <- renderUI({
   #   "txt"
-  #   req(input$confirmFasta)
+  #
   #   tagList(
   #     numericInput(
   #       "yInput",
@@ -247,13 +226,13 @@ server <- function(input, output, session) {
   
   output$confirmFile <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     tagList(actionButton("confirmFile", "Confirm File(s) Input"))
   })
   
   output$ctrInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     
     tagList(
       textInput(
@@ -268,7 +247,7 @@ server <- function(input, output, session) {
   
   output$cohortInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     
     
     tagList(
@@ -285,7 +264,7 @@ server <- function(input, output, session) {
   
   output$colorsInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     
     tagList(
       textInput(
@@ -300,7 +279,7 @@ server <- function(input, output, session) {
   })
   output$stdInput <- renderUI({
     "txt"
-    req(input$confirmFasta)
+    
     tagList(numericInput(
       "stdInput",
       "Select standard deviations : ",
@@ -412,24 +391,23 @@ server <- function(input, output, session) {
   observeEvent(input$confirmFile, {
     #UI LOGIC
     #######
-    shinyjs::hide("fileInput")
-    shinyjs::hide("file_typeInput")
-    shinyjs::hide("confirmFile")
-    shinyjs::hide("lfqInput")
-    shinyjs::hide("cutoffInput")
-    shinyjs::hide("intensityInput")
-    shinyjs::hide("cohortInput")
-    shinyjs::hide("ctrInput")
-    shinyjs::hide("parametricInput")
-    shinyjs::hide("pInput")
-    # shinyjs::hide("yInput")
-    shinyjs::hide("comparativeInput")
-    shinyjs::hide("colorsInput")
-    shinyjs::hide("stdInput")
-    shinyjs::hide("svgInput")
+    # shinyjs::hide("fileInput")
+    # shinyjs::hide("file_typeInput")
+    # shinyjs::hide("confirmFile")
+    # shinyjs::hide("lfqInput")
+    # shinyjs::hide("cutoffInput")
+    # shinyjs::hide("intensityInput")
+    # shinyjs::hide("cohortInput")
+    # shinyjs::hide("ctrInput")
+    # shinyjs::hide("parametricInput")
+    # shinyjs::hide("pInput")
+    # # shinyjs::hide("yInput")
+    # shinyjs::hide("comparativeInput")
+    # shinyjs::hide("colorsInput")
+    # shinyjs::hide("stdInput")
+    # shinyjs::hide("svgInput")
     
     #######
-    
     #Progress bar
     #######
     progress <- shiny::Progress$new()
@@ -451,8 +429,9 @@ server <- function(input, output, session) {
     comparative_combined <- data.frame()
     less_than_two <- data.frame()
     uniprot_ids <- as.data.frame(uniprot())
-    protein_plot <- list()
     colnames(uniprot_ids)  <- c("Protein.ID")
+    protein_plot <- list()
+    
     cohorts <- toupper(cohort_name())
     parametric_type <- parametric()
     ctr <- toupper(ctr_name())
@@ -519,18 +498,18 @@ server <- function(input, output, session) {
         
         #Nonparametric
         #####
-        if (parametric_type == 0 & length(cohorts) == 1) {
+        if (parametric_type == 0) {
           statisical_test <-
             getMannWhit(cohort_df, p_cutoff(), updateProgress)
           
           
         }
-        
-        
-        else if (parametric_type == 0) {
-          statisical_test <- getKruskal(cohort_df, updateProgress())
-          
-        }
+        #
+        #
+        # else if (parametric_type == 0) {
+        #   statisical_test <- getKruskal(cohort_df, updateProgress())
+        #
+        # }
         
         #####
         
@@ -539,16 +518,14 @@ server <- function(input, output, session) {
         
         
         else{
-          if (length(cohorts) > 1) {
-            statisical_test <- getANOVA(cohort_df, updateProgress)
-            
-            
-          }
-          else{
-            statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
-            
-            
-          }
+          # if (length(cohorts) > 1) {
+          #   statisical_test <- getANOVA(cohort_df, updateProgress)
+          #
+          #
+          # }
+          statisical_test <-
+            getTtest(cohort_df, p_cutoff(), updateProgress)
+          
           
         }
         
@@ -686,7 +663,7 @@ server <- function(input, output, session) {
               ymin = filtered_results()$FC - 0.05,
               ymax = filtered_results()$FC + 0.05,
               fill = isSignificant
-             
+              
             ),
             
             #Here I specify some stuff that will be universal for all blocks irrespective of column info.
@@ -723,7 +700,6 @@ server <- function(input, output, session) {
     }
     ######
     else{
-      print("hello")
       leftovers <-
         anti_join(comparative_combined, fasta, by = "Protein.ID")
       comparative_combined %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID) %>% mutate(
@@ -782,7 +758,7 @@ server <- function(input, output, session) {
               plotting_protein()$Cohort
             )
           )
-          # %>% 
+          # %>%
           #   column_to_rownames(var = "Cohort")
         )
         
@@ -834,7 +810,12 @@ server <- function(input, output, session) {
           
           #Specify the colours I want to use for the isSignificant column
           #scale_fill_manual(values = c("yes" = darken(plotting_protein()$color,0.4), "no" = lighten(plotting_protein()$color,0.2))) +
-          scale_fill_identity("Cohort",  labels = setNames(unique(plotting_protein()$Cohort), unique(plotting_protein()$color)), guide = "legend") +
+          scale_fill_identity("Cohort",
+                              labels = setNames(
+                                unique(plotting_protein()$Cohort),
+                                unique(plotting_protein()$color)
+                              ),
+                              guide = "legend") +
           theme(legend.position = "bottom",
                 legend.key = element_rect(colour = "white")) +
           guides(fill = guide_legend(order = 1),
@@ -997,65 +978,129 @@ server <- function(input, output, session) {
       
     }
     
-  )
+  ) 
   
   
   
   
   observeEvent(input$clickThrough, {
     plots <- as.list(protein_plotr())
-    ids <- as.data.frame(protein_ids())
-    if (j() < nrow(ids)) {
-      output$plot <- renderUI({
-        i <-  unique(protein_ids()[j(), 'Protein.ID'])
-        
-        plotting_protein(filter(located_peptides(), Protein.ID == i))
-        filtered_results(filter(located_peptides(), Protein.ID == i))
-        filtered_results(inner_join(
-          plot_fasta(),
-          plotting_protein(),
-          by  = c('Protein.ID', 'x', 'Gene', 'info'),
-          multiple = "all"
-        ))
-        
-        
-        protein_length <- unique(nchar(filtered_results()$x))
-        
-        
-        renderPlot({
-          plots[[i]]
+    uniprot_ids <- as.data.frame(uniprot())
+    colnames(uniprot_ids)  <- c("Protein.ID")
+    if (nrow(uniprot_ids) > 0) {
+      if (j() < nrow(uniprot_ids)) {
+        output$plot <- renderUI({
+          print(j())
+          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          
+          
+          print(i)
+          plotting_protein(filter(located_peptides(), Protein.ID == i))
+          filtered_results(filter(located_peptides(), Protein.ID == i))
+          filtered_results(inner_join(
+            plot_fasta(),
+            plotting_protein(),
+            by  = c('Protein.ID', 'x', 'Gene', 'info'),
+            multiple = "all"
+          ))
+          
+          
+          protein_length <- unique(nchar(filtered_results()$x))
+          
+          
+          renderPlot({
+            plots[[i]]
+            
+          })
           
         })
-        
-      })
-      j(j() + 1)
-      
-    }
-    else {
-      output$plot <- renderUI({
-        i <-  unique(ids[j(), 'Protein.ID'])
-        
-        
-        
-        plotting_protein(filter(located_peptides(), Protein.ID == i))
-        filtered_results(filter(located_peptides(), Protein.ID == i))
-        filtered_results(inner_join(
-          plot_fasta(),
-          plotting_protein(),
-          by  = c('Protein.ID', 'x', 'Gene', 'info'),
-          multiple = "all"
-        ))
-        
-        protein_length <- unique(nchar(filtered_results()$x))
-        
-        
-        renderPlot({
-          plots[[i]]
+        j(j() + 1)
+        print("addd")
+        print((j))
+      }
+      else {
+        output$plot <- renderUI({
+         
+          
+          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          print(i)
+          print(j())
+          
+          
+          plotting_protein(filter(located_peptides(), Protein.ID == i))
+          filtered_results(filter(located_peptides(), Protein.ID == i))
+          filtered_results(inner_join(
+            plot_fasta(),
+            plotting_protein(),
+            by  = c('Protein.ID', 'x', 'Gene', 'info'),
+            multiple = "all"
+          ))
+          
+          protein_length <- unique(nchar(filtered_results()$x))
+          
+          
+          renderPlot({
+            plots[[i]]
+          })
+          
         })
+        j(1)
         
-      })
-      j(1)
-      
+      }
+    }
+    else{
+      if (j() < nrow(protein_ids())) {
+        output$plot <- renderUI({
+          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          
+          plotting_protein(filter(located_peptides(), Protein.ID == i))
+          filtered_results(filter(located_peptides(), Protein.ID == i))
+          filtered_results(inner_join(
+            plot_fasta(),
+            plotting_protein(),
+            by  = c('Protein.ID', 'x', 'Gene', 'info'),
+            multiple = "all"
+          ))
+          
+          
+          protein_length <- unique(nchar(filtered_results()$x))
+          
+          
+          renderPlot({
+            plots[[i]]
+            
+          })
+          
+        })
+        j(j() + 1)
+        
+      }
+      else {
+        output$plot <- renderUI({
+          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          
+          
+          
+          plotting_protein(filter(located_peptides(), Protein.ID == i))
+          filtered_results(filter(located_peptides(), Protein.ID == i))
+          filtered_results(inner_join(
+            plot_fasta(),
+            plotting_protein(),
+            by  = c('Protein.ID', 'x', 'Gene', 'info'),
+            multiple = "all"
+          ))
+          
+          protein_length <- unique(nchar(filtered_results()$x))
+          
+          
+          renderPlot({
+            plots[[i]]
+          })
+          
+        })
+        j(1)
+        
+      }
     }
     
     
