@@ -59,28 +59,9 @@ server <- function(input, output, session) {
   #Fasta Input
   #######
   
-  # output$fastaInput <- renderUI({
-  #   "txt"
-  #   tagList(
-  #
-  #   )
-  # })
-  
-  
-  
-  
-  # output$uniprotInput <- renderUI({
-  #   "txt"
-  #
-  #
-  # })
-  
-  
   observeEvent(input$fastaInput, {
     fasta_reactive(readAAStringSet(input$fastaInput$datapath))
-    
-    
-    
+  
   })
   
   
@@ -96,188 +77,9 @@ server <- function(input, output, session) {
   #File Input
   ######
   
-  output$fileInput <- renderUI({
-    "txt"
-    
-    tagList(
-      fileInput(
-        "fileInput",
-        "Choose file : ",
-        multiple = TRUE,
-        accept = c("csv",
-                   "comma-separated-values",
-                   ".csv",
-                   ".tsv"),
-        buttonLabel = "Browse...",
-        placeholder = "No Files Selected"
-      )
-    )
-  })
   
   
-  output$file_typeInput <- renderUI({
-    "txt"
-    
-    
-    tagList(radioButtons(
-      "file_typeInput",
-      "Select Search Output Type : ",
-      c("MSFragger No modifications " = 0, "MSFragger Modified/Ion" = 1, "DIA-NN" = 2)
-    ))
-  })
   
-  output$lfqInput <- renderUI({
-    "txt"
-    
-    
-    tagList(radioButtons("lfqInput", "Select LFQ Type : ", c("None" = 1, "Max" = 0)))
-  })
-  
-  output$intensityInput <- renderUI({
-    "txt"
-    
-    
-    tagList(radioButtons(
-      "intensityInput",
-      "Select Intensity : ",
-      c(
-        "Intensity" = 0,
-        "Total" = 1,
-        "Unique" = 2
-      )
-    ))
-  })
-  
-  output$parametricInput <- renderUI({
-    "txt"
-    
-    
-    tagList(
-      radioButtons(
-        "parametricInput",
-        "Select Parametric or Nonparametric statistical test : ",
-        c("Parametric" = 1, "Nonparametric" = 0)
-      )
-    )
-  })
-
-  output$comparativeInput <- renderUI({
-    "txt"
-    
-    
-    tagList(
-      radioButtons(
-        "comparativeInput",
-        "Select Comparative TTest Results (Compares multiple cohort's ttest results) : ",
-        c("Noncomparative" = 0, "Comparative" = 1)
-      )
-    )
-  })
-  
-  
-  output$cutoffInput <- renderUI({
-    "txt"
-    
-    tagList(numericInput(
-      "cutoffInput",
-      "Select Cutoff : ",
-      0,
-      min = 0,
-      max = 100
-    ))
-  })
-  
-  output$pInput <- renderUI({
-    "txt"
-    
-    tagList(numericInput(
-      "pInput",
-      "Select p value for significance : ",
-      0.05,
-      min = 0,
-      max = 100
-    ))
-  })
-  
-  # output$yInput <- renderUI({
-  #   "txt"
-  #
-  #   tagList(
-  #     numericInput(
-  #       "yInput",
-  #       "Select Y-Axis (Will be used for both upregulation and downregulation) : ",
-  #       2.5,
-  #       min = 0,
-  #       max = 100
-  #     )
-  #   )
-  # })
-  
-  
-  output$confirmFile <- renderUI({
-    "txt"
-    
-    tagList(actionButton("confirmFile", "Confirm File(s) Input"))
-  })
-  
-  output$ctrInput <- renderUI({
-    "txt"
-    
-    
-    tagList(
-      textInput(
-        "ctrInput",
-        "Input control identifiers separated by commas : ",
-        placeholder = "Example CTR, AD, DLB etc."
-      ),
-      value = NULL
-      
-    )
-  })
-  
-  output$cohortInput <- renderUI({
-    "txt"
-    
-    
-    
-    tagList(
-      textInput(
-        "cohortInput",
-        "Input cohort identifiers separated by commas (,). [These should be the file names of the combined_petide.tsv] : ",
-        
-        placeholder = "Example AD, DLB etc."
-      ),
-      value = NULL
-    )
-  })
-  
-  
-  output$colorsInput <- renderUI({
-    "txt"
-    
-    
-    tagList(
-      textInput(
-        "colorsInput",
-        "Input hex value color codes :",
-        placeholder = "Example CTR, AD, DLB etc.",
-        value = "#E495A5,#86B875,#7DB0DD,#FFA500"
-      ),
-      value =  NULL
-      
-    )
-  })
-  output$stdInput <- renderUI({
-    "txt"
-    
-    tagList(numericInput(
-      "stdInput",
-      "Select standard deviations : ",
-      2,
-      min = 2,
-      max = 6
-    ))
-  })
   #######
   
   #File Observe
@@ -305,36 +107,33 @@ server <- function(input, output, session) {
     intensity(input$intensityInput)
     
   })
+  
   observeEvent(input$lfqInput, {
     lfq(input$lfqInput)
     
     
   })
+  
   observeEvent(input$parametricInput, {
     parametric(input$parametricInput)
     
   })
-  
   
   observeEvent(input$cutoffInput, {
     cutoff(input$cutoffInput)
     
   })
   
-  
-  # observeEvent(input$yInput, {
-  #   y_axis(input$yInput)
-  #
-  # })
-  
   observeEvent(input$pInput, {
     p_cutoff(input$pInput)
     
   })
+  
   observeEvent(input$stdInput, {
     std(input$stdInput)
     
   })
+  
   observeEvent(input$svgInput, {
     svg(input$svgInput)
     
@@ -364,9 +163,6 @@ server <- function(input, output, session) {
     colors_temp <- strsplit(colors_temp, ", |,| , ")
     colors_reactive(unlist(colors_temp))
     
-    
-    
-    
   })
   
   
@@ -379,8 +175,6 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$confirmFile, {
-    
-    
     #UI LOGIC
     #######
     # shinyjs::hide("fileInput")
@@ -437,17 +231,15 @@ server <- function(input, output, session) {
         separate(info, sep = 'GN=', c("info", "Gene")) %>%
         separate(Gene, sep = " ", c("Gene", "other"))
     )
-    fasta <- fasta[-c(1,5)]
+    fasta <- fasta[-c(1, 5)]
     df <- files()
     #######
     #Dateframe creation
     #######
-
+    
     if (comparative() == 0) {
       for (i in df) {
-        
         for (j in 1:length(cohorts)) {
-          
           temp <-
             cleanData(
               i,
@@ -544,7 +336,7 @@ server <- function(input, output, session) {
               updateProgress
             )
           temp[, 1] <- toupper(temp[, 1])
-          if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]),])) {
+          if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]), ])) {
             cohort_df <-
               cohortSplit(temp,
                           ctr,
@@ -601,7 +393,9 @@ server <- function(input, output, session) {
       leftovers <-
         anti_join(statisical_test, fasta, by = "Protein.ID")
       
-      statisical_test %<>% inner_join(fasta, by = c("Protein.ID", "Gene"), multiple = "all") %>% arrange(Protein.ID)
+      statisical_test %<>% inner_join(fasta,
+                                      by = c("Protein.ID", "Gene"),
+                                      multiple = "all") %>% arrange(Protein.ID)
       
       located_peptides(locatePeptides(statisical_test, updateProgress))
       #######
@@ -974,7 +768,7 @@ server <- function(input, output, session) {
       
     }
     
-  ) 
+  )
   
   
   
@@ -1016,8 +810,6 @@ server <- function(input, output, session) {
       }
       else {
         output$plot <- renderUI({
-         
-          
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
           print(i)
           print(j())
@@ -1139,8 +931,6 @@ server <- function(input, output, session) {
       }
       else {
         output$plot <- renderUI({
-          
-          
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
           print(i)
           print(j())

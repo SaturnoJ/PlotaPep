@@ -26,40 +26,103 @@ ui <- navbarPage(
   
   
   
-  tabPanel("File Input", (mainPanel(
-    fluidRow(
-      box(
-        uiOutput("fileInput"),
-        uiOutput("file_typeInput"),
-        uiOutput("intensityInput"),
-        uiOutput("lfqInput"), 
-        uiOutput("cutoffInput"),
-        uiOutput("uniprotInput"),
-        uiOutput("ctrInput"),
-        uiOutput("cohortInput"),
-        uiOutput("parametricInput"),
-        uiOutput("comparativeInput"),
-        uiOutput("pInput"),
-        uiOutput("colorsInput"),
-        uiOutput("stdInput"),
-        uiOutput("confirmFile"),
-      )
-      # ,
-      # disconnectMessage(
-      #   text = "An error occurred. For parametric analysis please ensure that there is at least one protein with at least two samples across all cohorts. Also ensure that the cohorts listed match the input file names.",
-      #   refresh = "Refresh",
-      #   background = "#FFFFFF",
-      #   colour = "#444444",
-      #   refreshColour = "#337AB7",
-      #   overlayColour = "#000000",
-      #   overlayOpacity = 0.6,
-      #   width = 450,
-      #   top = 50,
-      #   size = 22,
-      #   css = ""
-      # )
+  tabPanel("File Input", (mainPanel(fluidRow(
+    box(
+      fileInput(
+        "fileInput",
+        "Choose file : ",
+        multiple = TRUE,
+        accept = c("csv",
+                   "comma-separated-values",
+                   ".csv",
+                   ".tsv"),
+        buttonLabel = "Browse...",
+        placeholder = "No Files Selected"
+      ),
+      radioButtons(
+        "file_typeInput",
+        "Select Search Output Type : ",
+        c(
+          "MSFragger No modifications " = 0,
+          "MSFragger Modified/Ion" = 1,
+          "DIA-NN" = 2
+        )
+      ),
+      radioButtons(
+        "intensityInput",
+        "Select Intensity : ",
+        c(
+          "Intensity" = 0,
+          "Total" = 1,
+          "Unique" = 2
+        )
+      ),
+      radioButtons("lfqInput", "Select LFQ Type : ", c("None" = 1, "Max" = 0)),
+      numericInput(
+        "cutoffInput",
+        "Select Cutoff : ",
+        0,
+        min = 0,
+        max = 100
+      ),
+      textInput(
+        "ctrInput",
+        "Input control identifiers separated by commas : ",
+        placeholder = "Example CTR, AD, DLB etc."
+      ),
+      textInput(
+        "cohortInput",
+        "Input cohort identifiers separated by commas (,). [These should be the file names of the combined_petide.tsv] : ",
+        
+        placeholder = "Example AD, DLB etc."
+      ),
+      radioButtons(
+        "parametricInput",
+        "Select Parametric or Nonparametric statistical test : ",
+        c("Parametric" = 1, "Nonparametric" = 0)
+      ),
+      radioButtons(
+        "comparativeInput",
+        "Select Comparative TTest Results (Compares multiple cohort's ttest results) : ",
+        c("Noncomparative" = 0, "Comparative" = 1)
+      ),
+      numericInput(
+        "pInput",
+        "Select p value for significance : ",
+        0.05,
+        min = 0,
+        max = 100
+      ),
+      textInput(
+        "colorsInput",
+        "Input hex value color codes :",
+        placeholder = "Example CTR, AD, DLB etc.",
+        value = "#E495A5,#86B875,#7DB0DD,#FFA500"
+      ),
+      numericInput(
+        "stdInput",
+        "Select standard deviations : ",
+        2,
+        min = 2,
+        max = 6
+      ),
+      actionButton("confirmFile", "Confirm File(s) Input"),
     )
-  ))),
+    # ,
+    # disconnectMessage(
+    #   text = "An error occurred. For parametric analysis please ensure that there is at least one protein with at least two samples across all cohorts. Also ensure that the cohorts listed match the input file names.",
+    #   refresh = "Refresh",
+    #   background = "#FFFFFF",
+    #   colour = "#444444",
+    #   refreshColour = "#337AB7",
+    #   overlayColour = "#000000",
+    #   overlayOpacity = 0.6,
+    #   width = 450,
+    #   top = 50,
+    #   size = 22,
+    #   css = ""
+    # )
+  )))),
   
   tabPanel("Plot Output",
            
@@ -74,7 +137,7 @@ ui <- navbarPage(
                  "svgInput",
                  "Select .SVG or .PNG file formats : ",
                  c("PNG" = 0, "SVG" = 1)
-               ),               
+               ),
                tagList(
                  textInput(
                    "uniprotInput",
@@ -85,8 +148,7 @@ ui <- navbarPage(
                ),
                
              )
-           )), fluidRow(uiOutput("plot"))
-           ),
+           )), fluidRow(uiOutput("plot"))),
 )
 # dashboardBody(
 #
