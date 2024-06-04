@@ -33,7 +33,12 @@ cleanData <-
     }
     
     file <- df$File[1]
-    if(file_type == 1){
+    if(file_type == 2){
+      cleaned_df <-
+        diannCleaner(df, cutoff)
+      
+      }
+    else if(file_type == 1){
       cleaned_df <-
         fraggerCleanerIon(df, intensity, lfq, cutoff)
     }
@@ -63,6 +68,55 @@ cleanData <-
     
     return(as.data.frame(cleaned_df))
   }
+diannCleaner <-function(df, cutoff){
+  
+  #combine the ProteinGroup and Genes
+ df <-
+      unite(df,
+            Protein,
+            c(Protein.Ids,Genes, Stripped.Sequence, Modified.Sequence, Precursor.Charge),
+            sep = "|",
+            remove = FALSE)  
+  #Proteins to rownames
+  df <- tibble::column_to_rownames(df, "Protein")
+  
+  #deselect the not-user stuff
+  df <- dplyr::select(df, - Protein.Group, - Protein.Names, - Proteotypic, - Stripped.Sequence, - Precursor.Charge, - Modified.Sequence, - First.Protein.Description, - Protein.Group, - Genes, - Precursor.Id, - Protein.Ids)
+  
+  #Clean the Sample Names
+  colnames(df) <- sapply(strsplit(colnames(df), "\\", fixed=TRUE), tail, 1)
+  colnames(df) <- stringr::str_remove(colnames(df), ".d")
+  
+  #transpose, remove zeros, log2
+  df_transposed <-  data.frame(t(df))
+  rownames(df_transposed) <- colnames(df)
+  colnames(df_transposed) <- rownames(df)
+  df <- df_transposed
+  
+  df <- removeZero(df)
+  
+  
+  
+  #apply cutoff on the protein level
+  
+  df <-
+    purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
+  
+  
+  #Long Format it
+  df <- setDT(df, keep.rownames = "Sample")
+  df <- tidyr::gather(df,
+                      colnames(df)[2:ncol(df)],
+                      key = "Protein",
+                      value = "Intensity")
+  df$Intensity <- as.numeric(df$Intensity)
+  df <- removeZero(df)
+  
+    return(df)
+  
+  
+}
+  
 
 fraggerCleanerIon <-
   function(df, intensity, lfq, cutoff) {
@@ -75,13 +129,17 @@ fraggerCleanerIon <-
       names(df)[names(df) == 'Modified Sequence'] <-
         'Modified'
     }
+    if (grep('Protein ID', names(df))) {
+      names(df)[names(df) == 'Protein ID'] <-
+        'Protein.Ids'
+    }
     
-    
+
     #Select columns of interest
     df <-
       unite(df,
             Protein,
-            c(Protein, Sequence, Modified, Charge),
+            c(Protein.Ids,Gene, Sequence, Modified, Charge),
             sep = "|",
             remove = FALSE)
     # Select the specified Intensity.
@@ -146,7 +204,6 @@ fraggerCleanerIon <-
                         colnames(df)[2:ncol(df)],
                         key = "Protein",
                         value = "Intensity")
-    
     return(df)
   }
 
@@ -157,7 +214,10 @@ fraggerCleaner <-
       names(df)[names(df) == 'Peptide Sequence'] <-
         'Sequence'
     }
-    
+    if (grep('Protein ID', names(df))) {
+      names(df)[names(df) == 'Protein ID'] <-
+        'Protein.Ids'
+    }
     
     #Select columns of interest
     df <-
@@ -256,6 +316,7 @@ cohortSplit <-
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
+
     cohort_df <- data.frame()
     temp_ctr <- splitCtr(combined_cutoff_df, ctr)
     temp_ctr <- removeOutlier(temp_ctr, std)
@@ -276,6 +337,7 @@ cohortSplit <-
     return(as.data.frame(cohort_df))
   }
 removeOutlier <- function(df, std) {
+  
   #Determine correlations between sample and theoretical
   sample_correlations <- df %>%
     group_by(Protein) %>%
@@ -412,7 +474,6 @@ getTtest <- function(cohort_df, p, updateProgress = NULL) {
     updateProgress(detail = text)
   }
   
-  
   ttest_results <-  cohort_df %>%
     
     
@@ -422,24 +483,24 @@ getTtest <- function(cohort_df, p, updateProgress = NULL) {
     adjust_pvalue(method = "BH") %>%
     
     #Split the Protein name in Uniprot and Accession
-    separate(Protein, sep = '\\|', c("sp", "Protein.ID", "Accession", "Peptide"))  %>%
+    separate(Protein, sep = '\\|', c("Protein.ID", "Gene", "Peptide"))   %>%
     
     #Determine Fold change. Since we work with log-transformed values we can just substract
     mutate(FC = estimate1 - estimate2) %>%
-    
+
     #Create log10 p-vals
     mutate(log10adjustP = -1 * log10(p.adj)) %>%
-    
+
     #Determine if up or down regulated
     mutate(Direction = ifelse(p.adj > p, "NotSignificant", ifelse(FC < 0, "Down", "Up")))
-  
+
   ##Locate the peptides in the protein sequence and add the start and end point to the dataframe
   # located_peptides() <- ttest_results[(grepl(paste(dfIds),ttest_results$UniprotID))]
   ttest_results <-
     cbind(ttest_results,
           start_seq = NA,
           end_seq = NA)
-  
+
   if (ttest_results$group1[1] == "CTR") {
     ttest_results %<>% rename(group1 = "CTR", group2 = "Cohort")
     
@@ -480,7 +541,7 @@ getMannWhit <- function(cohort_df, p, updateProgress = NULL) {
     adjust_pvalue(method = "BH") %>%
     
     #Split the Protein name in Uniprot and Accession
-    separate(Protein, sep = '\\|', c("sp", "Protein.ID", "Accession", "Peptide"))  %>%
+    separate(Protein, sep = '\\|', c("Protein.ID", "Gene", "Peptide"))  %>%
     
     #Determine Fold change. Since we work with log-transformed values we can just substract
     mutate(FC = estimate) %>%
@@ -497,7 +558,6 @@ getMannWhit <- function(cohort_df, p, updateProgress = NULL) {
     cbind(mannwhit_results,
           start_seq = NA,
           end_seq = NA)
-  
   
   
   if (mannwhit_results$group1[1] == "CTR") {

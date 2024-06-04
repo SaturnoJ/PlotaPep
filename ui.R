@@ -21,59 +21,72 @@ ui <- navbarPage(
                buttonLabel = "Browse...",
                placeholder = "No FASTA Selected"
              )
-
+             
            )))),
   
   
   
-  tabPanel("File Input", (mainPanel(fluidRow(
-    box(
-      uiOutput("fileInput"),
-      uiOutput("file_typeInput"),
-      uiOutput("intensityInput"),
-      uiOutput("lfqInput"),
-      uiOutput("cutoffInput"),
-      uiOutput("uniprotInput"),
-      uiOutput("ctrInput"),
-      uiOutput("cohortInput"),
-      uiOutput("parametricInput"),
-      uiOutput("comparativeInput"),
-      uiOutput("pInput"),
-      uiOutput("colorsInput"),
-      uiOutput("stdInput"),
-      uiOutput("svgInput"),
-      uiOutput("confirmFile"),
-    ),
-    disconnectMessage(
-      text = "An error occurred. For parametric analysis please ensure that there is at least one protein with at least two samples across all cohorts. Also ensure that the cohorts listed match the input file names.",
-      refresh = "Refresh",
-      background = "#FFFFFF",
-      colour = "#444444",
-      refreshColour = "#337AB7",
-      overlayColour = "#000000",
-      overlayOpacity = 0.6,
-      width = 450,
-      top = 50,
-      size = 22,
-      css = ""
+  tabPanel("File Input", (mainPanel(
+    fluidRow(
+      box(
+        uiOutput("fileInput"),
+        uiOutput("file_typeInput"),
+        uiOutput("intensityInput"),
+        uiOutput("lfqInput"), 
+        uiOutput("cutoffInput"),
+        uiOutput("uniprotInput"),
+        uiOutput("ctrInput"),
+        uiOutput("cohortInput"),
+        uiOutput("parametricInput"),
+        uiOutput("comparativeInput"),
+        uiOutput("pInput"),
+        uiOutput("colorsInput"),
+        uiOutput("stdInput"),
+        uiOutput("confirmFile"),
+      )
+      # ,
+      # disconnectMessage(
+      #   text = "An error occurred. For parametric analysis please ensure that there is at least one protein with at least two samples across all cohorts. Also ensure that the cohorts listed match the input file names.",
+      #   refresh = "Refresh",
+      #   background = "#FFFFFF",
+      #   colour = "#444444",
+      #   refreshColour = "#337AB7",
+      #   overlayColour = "#000000",
+      #   overlayOpacity = 0.6,
+      #   width = 450,
+      #   top = 50,
+      #   size = 22,
+      #   css = ""
+      # )
     )
-  )))),
+  ))),
   
   tabPanel("Plot Output",
            
-           mainPanel(fluidRow(box(
-             disabled(downloadButton('downloadPlot', "Download the table")),
-             disabled(actionButton("clickThrough", "Next")),
-             tagList(
-               textInput(
-                 "uniprotInput",
-                 "Input Uniprot IDs separated by commas (,) : ",
-                 placeholder = "Example P05067, P02649, etc."
+           mainPanel(fluidRow(
+             box(
+               disabled(
+                 downloadButton('downloadPlot', "Download Plots and Final Data Table")
                ),
-               value = NULL
-             ),
-             fluidRow(uiOutput("plot"))
-           )))),
+               disabled(actionButton("previousPlot", "Previous")),
+               disabled(actionButton("nextPlot", "Next")),
+               radioButtons(
+                 "svgInput",
+                 "Select .SVG or .PNG file formats : ",
+                 c("PNG" = 0, "SVG" = 1)
+               ),               
+               tagList(
+                 textInput(
+                   "uniprotInput",
+                   "Input Uniprot IDs separated by commas (,) : ",
+                   placeholder = "Example P05067, P02649, etc."
+                 ),
+                 value = NULL
+               ),
+               
+             )
+           )), fluidRow(uiOutput("plot"))
+           ),
 )
 # dashboardBody(
 #
