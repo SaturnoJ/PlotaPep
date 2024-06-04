@@ -176,23 +176,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$confirmFile, {
     #UI LOGIC
-    #######
-    # shinyjs::hide("fileInput")
-    # shinyjs::hide("file_typeInput")
-    # shinyjs::hide("confirmFile")
-    # shinyjs::hide("lfqInput")
-    # shinyjs::hide("cutoffInput")
-    # shinyjs::hide("intensityInput")
-    # shinyjs::hide("cohortInput")
-    # shinyjs::hide("ctrInput")
-    # shinyjs::hide("parametricInput")
-    # shinyjs::hide("pInput")
-    # # shinyjs::hide("yInput")
-    # shinyjs::hide("comparativeInput")
-    # shinyjs::hide("colorsInput")
-    # shinyjs::hide("stdInput")
-    # shinyjs::hide("svgInput")
-    
+
     #######
     #Progress bar
     #######
@@ -926,8 +910,7 @@ server <- function(input, output, session) {
           
         })
         j(j() - 1)
-        print("addd")
-        print((j))
+    
       }
       else {
         output$plot <- renderUI({
@@ -981,8 +964,7 @@ server <- function(input, output, session) {
           })
           
         })
-        print(j())
-        print(nrow(protein_ids()))
+       
         j(j() - 1)
         
       }
