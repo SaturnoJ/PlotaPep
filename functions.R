@@ -42,6 +42,10 @@ cleanData <-
       cleaned_df <-
         fraggerCleanerIon(df, intensity, lfq, cutoff)
     }
+    else if(file_type == 3){
+      cleaned_df <-
+        fraggerCleanerIon(df, intensity, lfq, cutoff)
+    }
     else{
       cleaned_df <-
         fraggerCleaner(df, intensity, lfq, cutoff)
@@ -51,23 +55,12 @@ cleanData <-
       updateProgress(detail = text)
     }
     
-    # outlier_removed_df <- removeOutlier(cleaned_df)
-    
-    # combined_cutoff_df <- outlier_removed_df %>%
-    #   mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
-    #   group_by(Protein) %>%
-    #   mutate(countMissingValues = sum(!is.na(Intensity))) %>%
-    #   mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
-    #   filter(percentageMissing > 0.95) %>% # Apply cutoff of 95%
-    #   dplyr::select(Sample, Protein, Intensity) #clean up by selecting the original columns
-    #   combined_cutoff_df$File <- file
-    
-    
     
     cleaned_df$File <- file
     
     return(as.data.frame(cleaned_df))
   }
+
 diannCleaner <-function(df, cutoff){
   
   #combine the ProteinGroup and Genes
@@ -92,7 +85,7 @@ diannCleaner <-function(df, cutoff){
   rownames(df_transposed) <- colnames(df)
   colnames(df_transposed) <- rownames(df)
   df <- df_transposed
-  
+   
   df <- removeZero(df)
   
   
@@ -222,7 +215,7 @@ fraggerCleaner <-
     df <-
       unite(df,
             Protein,
-            c(Protein, Sequence),
+            c(Protein.Ids,Gene, Sequence),
             sep = "|",
             remove = FALSE)
     # Select the specified Intensity.
@@ -292,7 +285,46 @@ fraggerCleaner <-
   }
 
 
-
+genericCleaner <-function(df, cutoff){
+  
+  #combine the ProteinGroup and Genes
+  df <-
+    unite(df,
+          Protein,
+          c(Protein.Ids,Gene, Sequence),
+          sep = "|",
+          remove = FALSE)  
+  #Proteins to rownames
+  df <- tibble::column_to_rownames(df, "Protein")
+  
+  #transpose, remove zeros, log2
+  df_transposed <-  data.frame(t(df))
+  rownames(df_transposed) <- colnames(df)
+  colnames(df_transposed) <- rownames(df)
+  df <- df_transposed
+  
+  df <- removeZero(df)
+  
+  
+  
+  #apply cutoff on the protein level
+  
+  df <-
+    purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
+  
+  #Long Format it
+  df <- setDT(df, keep.rownames = "Sample")
+  df <- tidyr::gather(df,
+                      colnames(df)[2:ncol(df)],
+                      key = "Protein",
+                      value = "Intensity")
+  df$Intensity <- as.numeric(df$Intensity)
+  df <- removeZero(df)
+  
+  return(df)
+  
+  
+}
 
 removeZero <- function(df) {
   for (j in seq_len(ncol(df))) {
