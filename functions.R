@@ -98,10 +98,9 @@ diannCleaner <-function(df, cutoff){
   
   
   #apply cutoff on the protein level
-  
+
   df <-
     purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
-  
   
   #Long Format it
   df <- setDT(df, keep.rownames = "Sample")
