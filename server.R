@@ -176,7 +176,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$confirmFile, {
     #UI LOGIC
-    tryCatch({
+    # tryCatch({
       #######
       #Progress bar
       #######
@@ -207,7 +207,6 @@ server <- function(input, output, session) {
       parametric_type <- parametric()
       ctr <- toupper(ctr_name())
       protein_id_loop <- list
-      themp <- data.frame()
       colors_df <- as.list(colors_reactive())
       fasta <- as.data.frame(fasta_reactive())
       fasta <- tibble::rownames_to_column(fasta, "accession")
@@ -222,73 +221,8 @@ server <- function(input, output, session) {
       #######
       #Dateframe creation
       #######
-      
-      
-      if (comparative() == 0) {
-        for (i in df) {
-          for (j in 1:length(cohorts)) {
-            temp <-
-              cleanData(
-                i,
-                as.integer(intensity()),
-                as.integer(lfq()),
-                as.integer(cutoff()),
-                as.integer(file_type()),
-                updateProgress
-              )
-            
-            temp <-
-              cohortSplit(temp,
-                          ctr,
-                          cohorts[j],
-                          as.integer(std()),
-                          updateProgress)
-            
-            combined_cutoff_df <- rbind(combined_cutoff_df, temp)
-          }
-          possible <-
-            combined_cutoff_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
-                                                                                                  cohort1 = sum(!is.na(get(cohorts[j])))) %>%
-            mutate(possible = ifelse(ctr < 2 |
-                                       cohort1 < 2, FALSE, TRUE)) %>%
-            filter(possible)
-          
-          cohort_df <-
-            combined_cutoff_df %>% filter(Protein %in% possible$Protein)
-          
-          less_than_two <-
-            anti_join(cohort_df, combined_cutoff_df, by = "Protein")
-          
-          ########
-          
-          cohort_df$Intensity <- log2(cohort_df$Intensity)
-          
-          #Nonparametric
-          #####
-          if (parametric_type == 0) {
-            statisical_test <-
-              getMannWhit(cohort_df, p_cutoff(), updateProgress)
-            
-            
-          }
-          #####
-          
-          #Parametric
-          #######
-          
-          else{
-            statisical_test <-
-              getTtest(cohort_df, p_cutoff(), updateProgress)
-            
-            
-          }
-          
-          ########
-          
-        }
-      }
-      
-      else{
+
+
         for (i in df) {
           #Comparative
           #########
@@ -327,7 +261,6 @@ server <- function(input, output, session) {
             
             cohort_df <-
               cohort_df %>% filter(Protein %in% possible$Protein)
-            # cohort_df[cohort_df$Protein %in% cohort_df$Protein[duplicated(cohort_df$Protein)], ]
             cohort_df$Intensity <- log2(cohort_df$Intensity)
             
             
@@ -341,9 +274,9 @@ server <- function(input, output, session) {
             else{
               statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
               
+              
             }
             temp <-  anti_join(cohort_df, temp, by = "Protein")
-            
             less_than_two <- rbind(less_than_two, temp)
             comparative_combined <-
               rbind(comparative_combined, statisical_test)
@@ -354,8 +287,7 @@ server <- function(input, output, session) {
           text <- "Removing Outliers"
           updateProgress(detail = text)
         }
-      }
-      
+      file_names <- unique(comparative_combined$File)
       #Plotting loop
       ######
       if (comparative() == 0) {
@@ -459,13 +391,13 @@ server <- function(input, output, session) {
       ######
       else{
         leftovers <-
-          anti_join(comparative_combined, fasta, by = "Protein.ID")
-        comparative_combined %<>% inner_join(fasta, by = "Protein.ID", multiple = "all") %>% arrange(Protein.ID) %>% mutate(
+          anti_join(comparative_combined, fasta, by =c('Protein.ID',"Gene"))
+        comparative_combined %<>% inner_join(fasta, by = c('Protein.ID',"Gene"), multiple = "all") %>% arrange(Protein.ID) %>% mutate(
           colors = case_when(
-            Cohort == as.character(cohorts[1]) ~  as.character(colors_df[1]),
-            Cohort == as.character(cohorts[2]) ~ as.character(colors_df[2]),
-            Cohort == as.character(cohorts[3]) ~ as.character(colors_df[3]),
-            Cohort == as.character(cohorts[4]) ~ as.character(colors_df[4])
+            File == as.character(file_names[1]) ~  as.character(colors_df[1]),
+            File == as.character(file_names[2]) ~ as.character(colors_df[2]),
+            File == as.character(file_names[3]) ~ as.character(colors_df[3]),
+            File == as.character(file_names[4]) ~ as.character(colors_df[4])
           )
         )
         
@@ -485,7 +417,6 @@ server <- function(input, output, session) {
         else{
           protein_id_loop <-  unique(comparative_combined$Protein.ID)
         }
-        # browser()
         for (i in protein_id_loop)  {
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -510,14 +441,13 @@ server <- function(input, output, session) {
             ))
             
             %>% mutate(
-              Cohort = ifelse(
+              File = ifelse(
                 isSignificant == "yes",
-                paste0(plotting_protein()$Cohort, "_Significant"),
-                plotting_protein()$Cohort
+                paste0(plotting_protein()$File, "_Significant"),
+                plotting_protein()$File
               )
             )
-            # %>%
-            #   column_to_rownames(var = "Cohort")
+           
           )
           
           # names(pal_temp) <- colors$Cohort
@@ -568,9 +498,9 @@ server <- function(input, output, session) {
             
             #Specify the colours I want to use for the isSignificant column
             #scale_fill_manual(values = c("yes" = darken(plotting_protein()$color,0.4), "no" = lighten(plotting_protein()$color,0.2))) +
-            scale_fill_identity("Cohort",
+            scale_fill_identity("File",
                                 labels = setNames(
-                                  unique(plotting_protein()$Cohort),
+                                  unique(plotting_protein()$File),
                                   unique(plotting_protein()$color)
                                 ),
                                 guide = "legend") +
@@ -633,15 +563,15 @@ server <- function(input, output, session) {
       
       shinyjs::enable("downloadPlot")
       
-    },
+    # },
     
-    warning = function(warn) {
-      showNotification(paste0("Warning!Warning!Warning!"), type = 'warning')
-    },
-    error = function(err) {
-      showNotification(paste0("Check input parameters. Ensure that the cohorts identified are represented in the dataset. Ensure that dataset type is correct for file and if more than one file is being used that comparative is selected."), type = 'err')
-    })
-    
+    # warning = function(warn) {
+    #   showNotification(paste0("Warning!Warning!Warning!"), type = 'warning')
+    # },
+    # error = function(err) {
+    #   showNotification(paste0("Check input parameters. Ensure that the cohorts identified are represented in the dataset. Ensure that dataset type is correct for file and if more than one file is being used that comparative is selected."), type = 'err')
+    # })
+    # 
     
     
   })

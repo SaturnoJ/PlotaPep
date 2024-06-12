@@ -73,7 +73,8 @@ ui <- navbarPage(
           c(
             "MSFragger No modifications " = 0,
             "MSFragger Modified/Ion" = 1,
-            "DIA-NN" = 2
+            "DIA-NN" = 2,
+            "Generic Dataframe" = 3
           )
         ),
         radioButtons(
@@ -95,12 +96,12 @@ ui <- navbarPage(
         ),
         textInput(
           "ctrInput",
-          "Input control identifiers separated by commas : ",
+          "Input control identifier : ",
           placeholder = "Example CTR, AD, DLB etc."
         ),
         textInput(
           "cohortInput",
-          "Input cohort identifiers separated by commas (,). [These should be the file names of the combined_petide.tsv] : ",
+          "Input cohort identifiers : ",
           
           placeholder = "Example AD, DLB etc."
         ),

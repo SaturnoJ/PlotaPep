@@ -33,6 +33,7 @@ cleanData <-
     }
     
     file <- df$File[1]
+    df <-  subset(df, select=-c(File))
     if(file_type == 2){
       cleaned_df <-
         diannCleaner(df, cutoff)
@@ -44,7 +45,7 @@ cleanData <-
     }
     else if(file_type == 3){
       cleaned_df <-
-        fraggerCleanerIon(df, intensity, lfq, cutoff)
+        genericCleaner(df, cutoff)
     }
     else{
       cleaned_df <-
@@ -125,7 +126,7 @@ fraggerCleanerIon <-
       names(df)[names(df) == 'Protein ID'] <-
         'Protein.Ids'
     }
-    
+
 
     #Select columns of interest
     df <-
@@ -164,7 +165,6 @@ fraggerCleanerIon <-
                       Protein,
                       contains("Intensity"), -contains("MaxLFQ"))
     }
-    
     #col to rowname
     df <- data.frame(df[,-1], row.names = df[, 1])
     
@@ -196,6 +196,7 @@ fraggerCleanerIon <-
                         colnames(df)[2:ncol(df)],
                         key = "Protein",
                         value = "Intensity")
+    
     return(df)
   }
 
@@ -286,14 +287,14 @@ fraggerCleaner <-
 
 
 genericCleaner <-function(df, cutoff){
-  
+
   #combine the ProteinGroup and Genes
   df <-
     unite(df,
           Protein,
-          c(Protein.Ids,Gene, Sequence),
+          c(Protein.Ids,Genes, Sequence, Unique),
           sep = "|",
-          remove = FALSE)  
+          remove = TRUE)  
   #Proteins to rownames
   df <- tibble::column_to_rownames(df, "Protein")
   
@@ -318,6 +319,7 @@ genericCleaner <-function(df, cutoff){
                       colnames(df)[2:ncol(df)],
                       key = "Protein",
                       value = "Intensity")
+  df$Protein <- as.character(df$Protein)
   df$Intensity <- as.numeric(df$Intensity)
   df <- removeZero(df)
   
@@ -531,6 +533,7 @@ getTtest <- function(cohort_df, p, updateProgress = NULL) {
     cbind(ttest_results,
           start_seq = NA,
           end_seq = NA)
+  ttest_results$File <- unique(cohort_df$File)
 
   if (ttest_results$group1[1] == "CTR") {
     ttest_results %<>% rename(group1 = "CTR", group2 = "Cohort")
