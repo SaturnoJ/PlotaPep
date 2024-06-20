@@ -209,8 +209,7 @@ server <- function(input, output, session) {
       )
       fasta <- fasta[-c(1, 5)]
       df <- files()
-      broken <- 0
-      
+
       #Dateframe Creation
       #This portion of the code reads in the uploaded data files
       #and starts the processing of the data. This section creates the final
@@ -273,10 +272,9 @@ server <- function(input, output, session) {
         }
       }
       
-      if (is.function(updateProgress)) {
-        text <- "Removing Outliers"
-        updateProgress(detail = text)
-      }
+      
+      
+      
       #Adds file name to data for coloring
       file_names <- unique(comparative_combined$File)
       #Plotting loop
@@ -284,6 +282,7 @@ server <- function(input, output, session) {
       #Essentially the same loop except one has the inclusion of a color palet
       #and choses the color according to the filename
       if (comparative() == 0) {
+     
         leftovers <-
           anti_join(statisical_test, fasta, by = "Protein.ID")
         
@@ -295,6 +294,10 @@ server <- function(input, output, session) {
 
         protein_id_loop <-  unique(statisical_test$Protein.ID)
         for (i in protein_id_loop) {
+          if (is.function(updateProgress)) {
+            text <- "Plotting Peptides"
+            updateProgress(detail = text)
+          }
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -373,6 +376,7 @@ server <- function(input, output, session) {
         }
       }
       else{
+
         leftovers <-
           anti_join(comparative_combined,
                     fasta,
@@ -393,7 +397,10 @@ server <- function(input, output, session) {
         names(pal_temp) <- colors$Cohort
         pal(pal_temp)
         protein_id_loop <-  unique(comparative_combined$Protein.ID)
-        
+        if (is.function(updateProgress)) {
+          text <- "Plotting Peptides"
+          updateProgress(detail = text)
+        }
         for (i in protein_id_loop)  {
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))

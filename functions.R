@@ -18,9 +18,6 @@ library(shinydisconnect)
 library("colorspace")
 
 
-
-# clean the data
-#################
 cleanData <-
   function(df,
            intensity,
@@ -52,7 +49,7 @@ cleanData <-
         fraggerCleaner(df, intensity, lfq, cutoff)
     }
     if (is.function(updateProgress)) {
-      text <- "Removing Outliers"
+      text <- "Data Cleaned"
       updateProgress(detail = text)
     }
     
@@ -335,10 +332,7 @@ removeZero <- function(df) {
   return(df)
 }
 
-#################
 
-# Cohort Split
-########
 cohortSplit <-
   function(combined_cutoff_df,
            ctr,
@@ -352,9 +346,9 @@ cohortSplit <-
 
     cohort_df <- data.frame()
     temp_ctr <- splitCtr(combined_cutoff_df, ctr)
-    temp_ctr <- removeOutlier(temp_ctr, std)
+    temp_ctr <- removeOutlier(temp_ctr, std,updateProgress)
     temp_dx <- splitDisease(combined_cutoff_df, cohort)
-    temp_dx <- removeOutlier(temp_dx, std)
+    temp_dx <- removeOutlier(temp_dx, std,updateProgress)
     
     cohort_df <- rbind(temp_ctr, temp_dx)
     
@@ -369,8 +363,11 @@ cohortSplit <-
     
     return(as.data.frame(cohort_df))
   }
-removeOutlier <- function(df, std) {
-  
+removeOutlier <- function(df, std,updateProgress = NULL) {
+  if (is.function(updateProgress)) {
+    text <- "Removing Outliers"
+    updateProgress(detail = text)
+  }
   #Determine correlations between sample and theoretical
   sample_correlations <- df %>%
     group_by(Protein) %>%
@@ -393,11 +390,13 @@ removeOutlier <- function(df, std) {
   returndf <- df %>%
     dplyr::filter(Sample %in% dplyr::filter(sample_correlations_outlier, Outlier == F)$Sample) %>%
     dplyr::select(Protein, Sample, Intensity, File, Cohort)
-  
+  if (is.function(updateProgress)) {
+    text <- "Removed Outliers"
+    updateProgress(detail = text)
+  }
   return(returndf)
 }
 
-##extracts the dx df from the merged df
 splitDisease <- function(df, cohort) {
   df <-
     subset(df,
@@ -412,7 +411,6 @@ splitDisease <- function(df, cohort) {
   
 }
 
-##extracts the control df from the merged df
 splitCtr <- function(df, cohort) {
   df <-
     subset(df,
@@ -427,12 +425,9 @@ splitCtr <- function(df, cohort) {
 }
 
 
-######
 
 
 
-#Kruskal
-######
 
 getKruskal <- function(cohort_df, updateProgress = NULL) {
   if (is.function(updateProgress)) {
@@ -461,11 +456,8 @@ getKruskal <- function(cohort_df, updateProgress = NULL) {
   return(as.data.frame(kruskal_results))
 }
 
-######
 
 
-#ANOVA
-########
 getANOVA <- function(cohort_df, updateProgress = NULL) {
   if (is.function(updateProgress)) {
     text <- "Performing ANOVA (This may take a while)"
@@ -496,10 +488,7 @@ getANOVA <- function(cohort_df, updateProgress = NULL) {
 
 
 
-########
 
-#TTest
-########
 
 getTtest <- function(cohort_df, p, updateProgress = NULL) {
   if (is.function(updateProgress)) {
@@ -554,10 +543,7 @@ getTtest <- function(cohort_df, p, updateProgress = NULL) {
 }
 
 
-#########
 
-#MannWhitney
-######
 
 
 getMannWhit <- function(cohort_df, p, updateProgress = NULL) {
@@ -616,11 +602,7 @@ getMannWhit <- function(cohort_df, p, updateProgress = NULL) {
 
 
 
-######
 
-
-#Locate Peptides
-#######
 locatePeptides <- function(df,
                            updateProgress = NULL) {
   if (is.function(updateProgress)) {
@@ -650,5 +632,5 @@ locatePeptides <- function(df,
   return(df)
   
 }
-#######
+
 

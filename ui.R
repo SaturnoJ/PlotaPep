@@ -173,7 +173,7 @@ ui <- navbarPage(
       
       bsTooltip(
         id = "ctrInput",
-        title = "Input control identifier from your file input.This will determine how the fold change is plotted",
+        title = "Input control identifier from your file input. This will determine how the fold change is plotted",
         placement = "right",
         trigger = "hover"
       ),
