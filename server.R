@@ -22,17 +22,16 @@ source("functions.R", local = T)
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 30 * 1024 ^ 3)
-  #Reactive Variables
-  #######
   
+  #Reactive Variables Declaration
+  #These variables are persistent across all code in the server function
+  #######
   fasta_reactive <- reactiveVal()
   files <- reactiveVal()
   uniprot <- reactiveVal()
   intensity <- reactiveVal()
   lfq <- reactiveVal()
   cutoff <- reactiveVal()
-  downloadData <- reactiveVal()
-  df <- data.frame()
   protein_ids <- reactiveVal()
   j <- reactiveVal(1)
   located_peptides <- reactiveVal()
@@ -56,34 +55,28 @@ server <- function(input, output, session) {
   less_than <- reactiveVal()
   file_type <- reactiveVal()
   #######
-  #Fasta Input
-  #######
   
+  #Inputs for each tab on the UI
+  #Each observeEvent takes in an input from an UI element
+  #The input then is cast to the corresponding reactive variable
+  #Input
+  #########
+  #Fasta Inputs
   observeEvent(input$fastaInput, {
     fasta_reactive(readAAStringSet(input$fastaInput$datapath))
     
   })
   
-  
+  #Plot Inputs
   observeEvent(input$uniprotInput, {
     uniprotTemp <- input$uniprotInput
     uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
     uniprot(uniprotTemp)
   })
   
-  
-  #######
-  
-  #File Input
-  ######
+  #File Inputs
   
   
-  
-  
-  #######
-  
-  #File Observe
-  ########
   observeEvent(input$fileInput, {
     files <- input$fileInput
     df <- list()
@@ -146,7 +139,6 @@ server <- function(input, output, session) {
   
   observeEvent(input$ctrInput, {
     name_temp <- input$ctrInput
-    # name_temp <- strsplit(name_temp, ", |,| , ")
     ctr_name(unlist(name_temp))
     
   })
@@ -165,21 +157,19 @@ server <- function(input, output, session) {
     
   })
   
-  
-  
-  ########
-  
-  
+  #########
   
   
   
   
   observeEvent(input$confirmFile, {
-    #UI LOGIC
-    # tryCatch({
-      #######
+    #This is the main bulk of the code
+    #All calculations and mutations of the data occur in this block.
+    #Unfortunately the error catching is a bit lackluster since
+    #it only states that an error has occurred but not what has happened
+    tryCatch({
       #Progress bar
-      #######
+      #This block of code initializes the progress bar that appears
       progress <- shiny::Progress$new()
       progress$set(message = "Preparing Data", value = 0)
       # Close the progress when this reactive exits (even if there's an error)
@@ -193,16 +183,17 @@ server <- function(input, output, session) {
         }
         progress$set(value = value, detail = detail)
       }
-      #######
+      
       #Variable Declaration
-      #######
+      #These variables are non reactive meaning they can not be called
+      #outside of this observeEvent. Reactive variables are cast to the
+      #non-reactive variables for easier manipulation of data
       combined_cutoff_df <- data.frame()
       comparative_combined <- data.frame()
       less_than_two <- data.frame()
       uniprot_ids <- as.data.frame(uniprot())
       colnames(uniprot_ids)  <- c("Protein.ID")
       protein_plot <- list()
-      
       cohorts <- toupper(cohort_name())
       parametric_type <- parametric()
       ctr <- toupper(ctr_name())
@@ -218,78 +209,80 @@ server <- function(input, output, session) {
       )
       fasta <- fasta[-c(1, 5)]
       df <- files()
-      #######
-      #Dateframe creation
-      #######
-
-
-        for (i in df) {
-          #Comparative
-          #########
-          for (j in 1:length(cohorts)) {
-            temp <-
-              cleanData(
-                i,
-                as.integer(intensity()),
-                as.integer(lfq()),
-                as.integer(cutoff()),
-                as.integer(file_type()),
-                updateProgress
-              )
-            temp[, 1] <- toupper(temp[, 1])
-            if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]),])) {
-              cohort_df <-
-                cohortSplit(temp,
-                            ctr,
-                            cohorts[j],
-                            as.integer(std()),
-                            updateProgress)
-              
-            }
-            else{
-              next
-            }
-            
-            possible <-
-              cohort_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
-                                                                                           cohort1 = sum(!is.na(get(
-                                                                                             cohorts[j]
-                                                                                           )))) %>%
-              mutate(possible = ifelse(ctr < 2 |
-                                         cohort1 < 2, FALSE, TRUE)) %>%
-              filter(possible)
-            
+      broken <- 0
+      
+      #Dateframe Creation
+      #This portion of the code reads in the uploaded data files
+      #and starts the processing of the data. This section creates the final
+      #dataframe that is used for plotting.
+      for (i in df) {
+        for (j in 1:length(cohorts)) {
+          #This takes in the initial dataframe and then mutates it to a long
+          #format making it more easily used for statistical calculations.
+          temp <-
+            cleanData(
+              i,
+              as.integer(intensity()),
+              as.integer(lfq()),
+              as.integer(cutoff()),
+              as.integer(file_type()),
+              updateProgress
+            )
+          #Unifying the cases of the cohort and sample names, then splitting the
+          #data into cohorts based on the inputted cohort vs the sample name.
+          temp[, 1] <- toupper(temp[, 1])
+          if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]), ])) {
             cohort_df <-
-              cohort_df %>% filter(Protein %in% possible$Protein)
-            cohort_df$Intensity <- log2(cohort_df$Intensity)
+              cohortSplit(temp,
+                          ctr,
+                          cohorts[j],
+                          as.integer(std()),
+                          updateProgress)
             
-            
-            if (parametric_type == 0) {
-              statisical_test <-
-                getMannWhit(cohort_df, p_cutoff(), updateProgress)
-              
-              
-              
-            }
-            else{
-              statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
-              
-              
-            }
-            temp <-  anti_join(cohort_df, temp, by = "Protein")
-            less_than_two <- rbind(less_than_two, temp)
-            comparative_combined <-
-              rbind(comparative_combined, statisical_test)
           }
+          else{
+            next
+          }
+          
+          #Determines what proteins are usable for a t-test and then removes
+          #those that do not have 2 or more entries.
+          possible <-
+            cohort_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
+                                                                                         cohort1 = sum(!is.na(get(cohorts[j])))) %>%
+            mutate(possible = ifelse(ctr < 2 |
+                                       cohort1 < 2, FALSE, TRUE)) %>%
+            filter(possible)
+          
+          cohort_df <-
+            cohort_df %>% filter(Protein %in% possible$Protein)
+          cohort_df$Intensity <- log2(cohort_df$Intensity)
+          
+          
+          if (parametric_type == 0) {
+            statisical_test <-
+              getMannWhit(cohort_df, p_cutoff(), updateProgress)
+          }
+          else{
+            statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
+          }
+          
+          temp <-  anti_join(cohort_df, temp, by = "Protein")
+          less_than_two <- rbind(less_than_two, temp)
+          comparative_combined <-
+            rbind(comparative_combined, statisical_test)
         }
-        
-        if (is.function(updateProgress)) {
-          text <- "Removing Outliers"
-          updateProgress(detail = text)
-        }
+      }
+      
+      if (is.function(updateProgress)) {
+        text <- "Removing Outliers"
+        updateProgress(detail = text)
+      }
+      #Adds file name to data for coloring
       file_names <- unique(comparative_combined$File)
       #Plotting loop
-      ######
+      #Two different loops depending on if the plots are comparative or not.
+      #Essentially the same loop except one has the inclusion of a color palet
+      #and choses the color according to the filename
       if (comparative() == 0) {
         leftovers <-
           anti_join(statisical_test, fasta, by = "Protein.ID")
@@ -299,13 +292,8 @@ server <- function(input, output, session) {
                                         multiple = "all") %>% arrange(Protein.ID)
         
         located_peptides(locatePeptides(statisical_test, updateProgress))
-        #######
-        if (nrow(uniprot_ids) > 0) {
-          protein_id_loop <- uniprot_ids
-        }
-        else{
-          protein_id_loop <-  unique(statisical_test$Protein.ID)
-        }
+
+        protein_id_loop <-  unique(statisical_test$Protein.ID)
         for (i in protein_id_loop) {
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -382,41 +370,30 @@ server <- function(input, output, session) {
               ),
               title = as.character(filtered_results()$Gene)
             )
-          
-          
-          
-          
         }
       }
-      ######
       else{
         leftovers <-
-          anti_join(comparative_combined, fasta, by =c('Protein.ID',"Gene"))
-        comparative_combined %<>% inner_join(fasta, by = c('Protein.ID',"Gene"), multiple = "all") %>% arrange(Protein.ID) %>% mutate(
-          colors = case_when(
-            File == as.character(file_names[1]) ~  as.character(colors_df[1]),
-            File == as.character(file_names[2]) ~ as.character(colors_df[2]),
-            File == as.character(file_names[3]) ~ as.character(colors_df[3]),
-            File == as.character(file_names[4]) ~ as.character(colors_df[4])
-          )
-        )
-        
-        
+          anti_join(comparative_combined,
+                    fasta,
+                    by = c('Protein.ID', "Gene"))
+        comparative_combined %<>% inner_join(fasta,
+                                             by = c('Protein.ID', "Gene"),
+                                             multiple = "all") %>% arrange(Protein.ID) %>% mutate(
+                                               colors = case_when(
+                                                 File == as.character(file_names[1]) ~  as.character(colors_df[1]),
+                                                 File == as.character(file_names[2]) ~ as.character(colors_df[2]),
+                                                 File == as.character(file_names[3]) ~ as.character(colors_df[3]),
+                                                 File == as.character(file_names[4]) ~ as.character(colors_df[4])
+                                               )
+                                             )
         located_peptides(locatePeptides(comparative_combined, updateProgress))
         colors <- distinct(comparative_combined, Cohort, colors)
         pal_temp <- colors$color
         names(pal_temp) <- colors$Cohort
         pal(pal_temp)
+        protein_id_loop <-  unique(comparative_combined$Protein.ID)
         
-        #Plotting loop
-        #######
-        if (nrow(uniprot_ids) > 0) {
-          protein_id_loop <- uniprot_ids
-          
-        }
-        else{
-          protein_id_loop <-  unique(comparative_combined$Protein.ID)
-        }
         for (i in protein_id_loop)  {
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -447,7 +424,6 @@ server <- function(input, output, session) {
                 plotting_protein()$File
               )
             )
-           
           )
           
           # names(pal_temp) <- colors$Cohort
@@ -497,7 +473,6 @@ server <- function(input, output, session) {
             theme_bw() +
             
             #Specify the colours I want to use for the isSignificant column
-            #scale_fill_manual(values = c("yes" = darken(plotting_protein()$color,0.4), "no" = lighten(plotting_protein()$color,0.2))) +
             scale_fill_identity("File",
                                 labels = setNames(
                                   unique(plotting_protein()$File),
@@ -517,21 +492,17 @@ server <- function(input, output, session) {
                 as.character(i),
                 " p == ",
                 p_cutoff(),
-                " standard deviations ==",
+                " Standard Deviations ==",
                 std()
               ),
               title = as.character(filtered_results()$Gene)
             )
-          
-          
-          
         }
-        
-        
-        
       }
+      
       #Reactive Variables
-      ######
+      #Variables that are used in the other obbserveEvent for the plot
+      #downloads and in browser previews.
       protein_plotr(protein_plot)
       plot_fasta(fasta)
       if (nrow(uniprot_ids) == 0) {
@@ -563,19 +534,23 @@ server <- function(input, output, session) {
       
       shinyjs::enable("downloadPlot")
       
-    # },
+    },
     
-    # warning = function(warn) {
-    #   showNotification(paste0("Warning!Warning!Warning!"), type = 'warning')
-    # },
-    # error = function(err) {
-    #   showNotification(paste0("Check input parameters. Ensure that the cohorts identified are represented in the dataset. Ensure that dataset type is correct for file and if more than one file is being used that comparative is selected."), type = 'err')
-    # })
-    # 
+    error = function(err) {
+      showNotification(
+        paste0(
+          "Check input parameters. Ensure that the cohorts identified are represented in the dataset. Ensure that dataset type is correct for file and if more than one file is being used that comparative is selected."
+        ),
+        type = 'err'
+      )
+    }, silent = TRUE)
+    
     
     
   })
-  
+  #Download
+  #Used to download the files from the plotting loop. Can choose between two
+  #different file formats
   output$downloadPlot <- downloadHandler(
     filename = 'plots.zip',
     content = function(file) {
@@ -596,8 +571,6 @@ server <- function(input, output, session) {
             ))
             
             protein_length <- unique(nchar(filtered_results()$x))
-            
-            
             ggsave(
               paste(
                 as.character(filtered_results()$Gene[1]),
@@ -609,7 +582,6 @@ server <- function(input, output, session) {
               plot = plots[[i]],
               device = "png"
             )
-            
           }
         }
       }
@@ -627,8 +599,6 @@ server <- function(input, output, session) {
             ))
             
             protein_length <- unique(nchar(filtered_results()$x))
-            
-            
             ggsave(
               paste(
                 as.character(filtered_results()$Gene[1]),
@@ -642,7 +612,6 @@ server <- function(input, output, session) {
             )
           }
         }
-        
       }
       
       write.csv(final_dataframe()
@@ -672,7 +641,10 @@ server <- function(input, output, session) {
   )
   
   
-  
+  #Next and Previous
+  #Essentially the same logic between the two of them with the index of 
+  #the dataframe being incremented by 1 if clicking next or decremented by
+  #1 if previous is clicked. These display the plots from the loop in browser.
   
   observeEvent(input$nextPlot, {
     plots <- as.list(protein_plotr())
@@ -681,11 +653,8 @@ server <- function(input, output, session) {
     if (nrow(uniprot_ids) > 0) {
       if (j() < nrow(uniprot_ids)) {
         output$plot <- renderUI({
-          print(j())
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-          
-          
-          print(i)
+       
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -694,28 +663,18 @@ server <- function(input, output, session) {
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
+        
           renderPlot({
             plots[[i]]
-            
           })
-          
         })
         j(j() + 1)
-        print("addd")
-        print((j))
       }
       else {
         output$plot <- renderUI({
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-          print(i)
-          print(j())
-          
-          
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -726,15 +685,11 @@ server <- function(input, output, session) {
           ))
           
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
           renderPlot({
             plots[[i]]
           })
-          
         })
         j(1)
-        
       }
     }
     else{
@@ -750,16 +705,12 @@ server <- function(input, output, session) {
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
+
           renderPlot({
             plots[[i]]
-            
           })
-          
         })
         j(j() + 1)
         
@@ -767,8 +718,6 @@ server <- function(input, output, session) {
       else {
         output$plot <- renderUI({
           i <-  unique(protein_ids()[j(), 'Protein.ID'])
-          
-          
           
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -780,19 +729,13 @@ server <- function(input, output, session) {
           ))
           
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
           renderPlot({
             plots[[i]]
           })
-          
         })
         j(1)
-        
       }
     }
-    
-    
   })
   
   observeEvent(input$previousPlot, {
@@ -802,11 +745,7 @@ server <- function(input, output, session) {
     if (nrow(uniprot_ids) > 0) {
       if (j() < nrow(uniprot_ids)  & j() != 1) {
         output$plot <- renderUI({
-          print(j())
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-          
-          
-          print(i)
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -816,13 +755,9 @@ server <- function(input, output, session) {
             multiple = "all"
           ))
           
-          
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
           renderPlot({
             plots[[i]]
-            
           })
           
         })
@@ -832,9 +767,6 @@ server <- function(input, output, session) {
       else {
         output$plot <- renderUI({
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-          print(i)
-          print(j())
-          
           
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -846,12 +778,10 @@ server <- function(input, output, session) {
           ))
           
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
+
           renderPlot({
             plots[[i]]
           })
-          
         })
         j(1)
         
@@ -861,7 +791,6 @@ server <- function(input, output, session) {
       if (j() <= nrow(protein_ids()) & j() != 1) {
         output$plot <- renderUI({
           i <-  unique(protein_ids()[j(), 'Protein.ID'])
-          
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -870,27 +799,17 @@ server <- function(input, output, session) {
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
           renderPlot({
             plots[[i]]
-            
           })
-          
         })
-        
         j(j() - 1)
-        
       }
       else {
         output$plot <- renderUI({
           i <-  unique(protein_ids()[j(), 'Protein.ID'])
-          
-          
-          
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -899,24 +818,14 @@ server <- function(input, output, session) {
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
           protein_length <- unique(nchar(filtered_results()$x))
-          
-          
           renderPlot({
             plots[[i]]
           })
-          
         })
         j(as.integer(nrow(protein_ids())))
-        
       }
     }
-    
-    
   })
-  
-  
-  
-  
+
 }
