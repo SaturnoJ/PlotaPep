@@ -54,6 +54,8 @@ server <- function(input, output, session) {
   svg <- reactiveVal()
   less_than <- reactiveVal()
   file_type <- reactiveVal()
+  original <- reactiveVal()
+  key_file <- reactiveVal()
   #######
   
   #Inputs for each tab on the UI
@@ -74,6 +76,32 @@ server <- function(input, output, session) {
     uniprot(uniprotTemp)
   })
   
+  #Rename Input
+  observeEvent(input$originalInput, {
+    files <- input$originalInput
+    df <- list()
+    for (i in 1:nrow(files)) {
+      df[[i]] <-
+        as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
+      df[[i]]$File <- str_sub(files$name[i], end = -5)
+      
+    }
+    original(df)
+    
+  })
+  observeEvent(input$keyInput, {
+    files <- input$keyInput
+    df <- list()
+    for (i in 1:nrow(files)) {
+      df[[i]] <-
+        as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
+            df[[i]]$File <- str_sub(files$name[i], end = -5)
+
+
+    }
+    key_file(df)
+
+  })
   #File Inputs
   
   
@@ -159,6 +187,31 @@ server <- function(input, output, session) {
   
   #########
   
+output$confirmKey <-downloadHandler(
+  
+  filename=function(){
+    browser()
+    paste0(unique(as.character(original()[[1]]$File)),"_keymatched.csv",sep="")
+    
+  },
+  content = function(file){
+    browser()
+    #Two inputted dataframes, original which has obfuscated cohorts and 
+    #the key for the obfuscated cohorts
+    
+    original <- original()[[1]]
+    key_file <- key_file()[[1]]
+    key_file <-key_file[complete.cases(key_file),]
+    key_file <- key_file[!duplicated(key_file), ]
+    
+    for(i in 1:nrow(key_file)){
+      colnames(original)[key_file$Sample[i]==colnames(original)] <- key_file$Cohort[i]
+      
+    }
+    
+    write.csv(original,file)
+})
+    
   
   
   
@@ -230,6 +283,7 @@ server <- function(input, output, session) {
           #Unifying the cases of the cohort and sample names, then splitting the
           #data into cohorts based on the inputted cohort vs the sample name.
           temp[, 1] <- toupper(temp[, 1])
+
           if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]), ])) {
             cohort_df <-
               cohortSplit(temp,
@@ -640,7 +694,7 @@ server <- function(input, output, session) {
       
       zip::zip(file, files = zip_files)
       files_to_delete <-
-        dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$")
+        dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
       file.remove(file.path(getwd(), files_to_delete))
       
     }

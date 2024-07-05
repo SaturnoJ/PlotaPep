@@ -9,6 +9,61 @@ ui <- navbarPage(
   "PlotaPep",
   theme = shinytheme("flatly"),
   useShinyjs(),
+  tabPanel(
+    "Key Input",
+    mainPanel(fluidRow(box(
+      fileInput(
+        "originalInput",
+        "Input original file to be renamed : ",
+        multiple = FALSE,
+        accept =c("csv",
+                  "comma-separated-values",
+                  ".csv",
+                  ".tsv"),
+        # close c
+        buttonLabel = "Browse...",
+        placeholder = "No FASTA Selected"
+      ), 
+      fileInput(
+        "keyInput",
+        "Choose key file : ",
+        multiple = FALSE,
+        accept =c("csv",
+                  "comma-separated-values",
+                  ".csv",
+                  ".tsv"),
+        buttonLabel = "Browse...",
+        placeholder = "No original selected"
+      ),
+      downloadButton("confirmKey", "Run Key"),
+      
+    )),
+    fluidRow(
+      bsTooltip(
+        id = "keyInput",
+        title = "This is an input",
+        placement = "right",
+        trigger = "manual"
+      ),
+    )),
+    fluidRow(column(4, wellPanel(
+      p("How to use:"),
+      p(
+        " 1. Choose FASTA File. Can be any FASTA file but if it doesn't have the proteins you're looking for it will not be plotted"
+      ),
+      p(
+        " 2. Input data set(s) to be plotted can be one or multiple. If multiple dataset are being plotted then be sure to choose the comparative option"
+      ),
+      p(
+        " 3. Select file output type. Currently supported MSFragger combined peptide with and without modifications and DIANN pr.matrix."
+      ),
+      p(
+        " 4. Set cohorts to be plotted, the cohort set for the control is what fold change will be based off of."
+      ),
+      p(" 5. Set other options to preference then run."),
+      p(" 6. Use the text input above the plots to search for specific plots.")
+    )))
+  ),
   
   tabPanel(
     "Fasta Input",
@@ -17,12 +72,14 @@ ui <- navbarPage(
         "fastaInput",
         "Choose FASTA file : ",
         multiple = FALSE,
-        accept = c("fasta", ".FASTA", "FASTA", ".fasta"),
-        # close c
+        accept = c("csv",
+                   "comma-separated-values",
+                   ".csv",
+                   ".tsv"),
         buttonLabel = "Browse...",
-        placeholder = "No FASTA Selected"
+        placeholder = "No original selected"
       )
-      
+      ,
     )),
     fluidRow(
       bsTooltip(
@@ -94,17 +151,13 @@ ui <- navbarPage(
           min = 0,
           max = 100
         ),
-        textInput(
-          "ctrInput",
-          "Input control identifier : ",
-          placeholder = "Example CTR, AD, DLB etc."
-        ),
-        textInput(
-          "cohortInput",
-          "Input cohort identifiers : ",
-          
-          placeholder = "Example AD, DLB etc."
-        ),
+        textInput("ctrInput",
+                  "Input control identifier : ",
+                  placeholder = "Example CTR, AD, DLB etc."),
+        textInput("cohortInput",
+                  "Input cohort identifiers : ",
+                  
+                  placeholder = "Example AD, DLB etc."),
         radioButtons(
           "parametricInput",
           "Select Parametric or Nonparametric statistical test : ",

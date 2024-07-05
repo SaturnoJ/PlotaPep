@@ -343,7 +343,6 @@ cohortSplit <-
       text <- "Creating Cohorts"
       updateProgress(detail = text)
     }
-
     cohort_df <- data.frame()
     temp_ctr <- splitCtr(combined_cutoff_df, ctr)
     temp_ctr <- removeOutlier(temp_ctr, std,updateProgress)
