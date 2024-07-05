@@ -190,12 +190,10 @@ server <- function(input, output, session) {
 output$confirmKey <-downloadHandler(
   
   filename=function(){
-    browser()
     paste0(unique(as.character(original()[[1]]$File)),"_keymatched.csv",sep="")
     
   },
   content = function(file){
-    browser()
     #Two inputted dataframes, original which has obfuscated cohorts and 
     #the key for the obfuscated cohorts
     
@@ -210,6 +208,9 @@ output$confirmKey <-downloadHandler(
     }
     
     write.csv(original,file)
+    files_to_delete <-
+      dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
+    file.remove(file.path(getwd(), files_to_delete))
 })
     
   
