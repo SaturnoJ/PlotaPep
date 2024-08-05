@@ -263,7 +263,6 @@ output$confirmKey <-downloadHandler(
       )
       fasta <- fasta[-c(1, 5)]
       df <- files()
-
       #Dateframe Creation
       #This portion of the code reads in the uploaded data files
       #and starts the processing of the data. This section creates the final
@@ -300,6 +299,7 @@ output$confirmKey <-downloadHandler(
           
           #Determines what proteins are usable for a t-test and then removes
           #those that do not have 2 or more entries.
+
           possible <-
             cohort_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
                                                                                          cohort1 = sum(!is.na(get(cohorts[j])))) %>%
