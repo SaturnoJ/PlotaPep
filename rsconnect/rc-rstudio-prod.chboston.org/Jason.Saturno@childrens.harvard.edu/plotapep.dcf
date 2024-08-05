@@ -5,9 +5,9 @@ account: Jason.Saturno@childrens.harvard.edu
 server: rc-rstudio-prod.chboston.org
 hostUrl: https://rc-rstudio-prod.chboston.org/__api__
 appId: 127
-bundleId: 1022
+bundleId:
 url: https://rc-rstudio-prod.chboston.org/content/c5ddb0aa-6186-4176-a0e2-eac073c34357/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: _keymatched.txt|README.md
+ignoredFiles: README.md

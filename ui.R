@@ -49,19 +49,14 @@ ui <- navbarPage(
     fluidRow(column(4, wellPanel(
       p("How to use:"),
       p(
-        " 1. Choose FASTA File. Can be any FASTA file but if it doesn't have the proteins you're looking for it will not be plotted"
+        " 1. Choose File that needs its sample names unobscured"
       ),
       p(
-        " 2. Input data set(s) to be plotted can be one or multiple. If multiple dataset are being plotted then be sure to choose the comparative option"
+        " 2. Input Key file that contains two columns one with the sample names and the other with the cohort names"
       ),
       p(
-        " 3. Select file output type. Currently supported MSFragger combined peptide with and without modifications and DIANN pr.matrix."
-      ),
-      p(
-        " 4. Set cohorts to be plotted, the cohort set for the control is what fold change will be based off of."
-      ),
-      p(" 5. Set other options to preference then run."),
-      p(" 6. Use the text input above the plots to search for specific plots.")
+        " 3. Run then download"
+      )
     )))
   ),
   
