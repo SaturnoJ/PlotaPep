@@ -22,7 +22,7 @@ source("functions.R", local = T)
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 30 * 1024 ^ 3)
-  
+
   #Reactive Variables Declaration
   #These variables are persistent across all code in the server function
   #######
@@ -31,7 +31,8 @@ server <- function(input, output, session) {
   uniprot <- reactiveVal()
   intensity <- reactiveVal()
   lfq <- reactiveVal()
-  cutoff <- reactiveVal()
+  ctr_cutoff <- reactiveVal()
+  case_cutoff <- reactiveVal()
   protein_ids <- reactiveVal()
   j <- reactiveVal(1)
   located_peptides <- reactiveVal()
@@ -57,7 +58,7 @@ server <- function(input, output, session) {
   original <- reactiveVal()
   key_file <- reactiveVal()
   #######
-  
+
   #Inputs for each tab on the UI
   #Each observeEvent takes in an input from an UI element
   #The input then is cast to the corresponding reactive variable
@@ -66,16 +67,16 @@ server <- function(input, output, session) {
   #Fasta Inputs
   observeEvent(input$fastaInput, {
     fasta_reactive(readAAStringSet(input$fastaInput$datapath))
-    
+
   })
-  
+
   #Plot Inputs
   observeEvent(input$uniprotInput, {
     uniprotTemp <- input$uniprotInput
     uniprotTemp <- strsplit(uniprotTemp, ", |,| , ")
     uniprot(uniprotTemp)
   })
-  
+
   #Rename Input
   observeEvent(input$originalInput, {
     files <- input$originalInput
@@ -84,10 +85,10 @@ server <- function(input, output, session) {
       df[[i]] <-
         as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
       df[[i]]$File <- str_sub(files$name[i], end = -5)
-      
+
     }
     original(df)
-    
+
   })
   observeEvent(input$keyInput, {
     files <- input$keyInput
@@ -103,119 +104,122 @@ server <- function(input, output, session) {
 
   })
   #File Inputs
-  
-  
+
+
   observeEvent(input$fileInput, {
     files <- input$fileInput
     df <- list()
     for (i in 1:nrow(files)) {
       df[[i]] <-
         as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
-      
+
       df[[i]]$File <- str_sub(files$name[i], end = -5)
-      
+
     }
     files(df)
-    
+
   })
-  
+
   observeEvent(input$file_typeInput, {
     file_type(input$file_typeInput)
-    
+
   })
-  
+
   observeEvent(input$intensityInput, {
     intensity(input$intensityInput)
-    
+
   })
-  
+
   observeEvent(input$lfqInput, {
     lfq(input$lfqInput)
-    
-    
+
+
   })
-  
+
   observeEvent(input$parametricInput, {
     parametric(input$parametricInput)
-    
+
   })
-  
-  observeEvent(input$cutoffInput, {
-    cutoff(input$cutoffInput)
-    
+
+  observeEvent(input$ctr_cutoffInput, {
+    ctr_cutoff(input$ctr_cutoffInput)
+
   })
-  
+  observeEvent(input$case_cutoffInput, {
+    case_cutoff(input$case_cutoffInput)
+
+  })
   observeEvent(input$pInput, {
     p_cutoff(input$pInput)
-    
+
   })
-  
+
   observeEvent(input$stdInput, {
     std(input$stdInput)
-    
+
   })
-  
+
   observeEvent(input$svgInput, {
     svg(input$svgInput)
-    
+
   })
-  
+
   observeEvent(input$comparativeInput, {
     comparative(input$comparativeInput)
-    
+
   })
-  
+
   observeEvent(input$ctrInput, {
     name_temp <- input$ctrInput
     ctr_name(unlist(name_temp))
-    
+
   })
-  
+
   observeEvent(input$cohortInput, {
     name_temp <- input$cohortInput
     name_temp <- strsplit(name_temp, ", |,| , ")
     cohort_name(unlist(name_temp))
-    
+
   })
-  
+
   observeEvent(input$colorsInput, {
     colors_temp <- input$colorsInput
     colors_temp <- strsplit(colors_temp, ", |,| , ")
     colors_reactive(unlist(colors_temp))
-    
+
   })
-  
+
   #########
-  
+
 output$confirmKey <-downloadHandler(
-  
+
   filename=function(){
     paste0(unique(as.character(original()[[1]]$File)),"_keymatched.csv",sep="")
-    
+
   },
   content = function(file){
-    #Two inputted dataframes, original which has obfuscated cohorts and 
+    #Two inputted dataframes, original which has obfuscated cohorts and
     #the key for the obfuscated cohorts
-    
+
     original <- original()[[1]]
     key_file <- key_file()[[1]]
     key_file <-key_file[complete.cases(key_file),]
     key_file <- key_file[!duplicated(key_file), ]
-    
+
     for(i in 1:nrow(key_file)){
       colnames(original)[key_file$Sample[i]==colnames(original)] <- key_file$Cohort[i]
-      
+
     }
-    
+
     write.csv(original,file)
     files_to_delete <-
       dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
     file.remove(file.path(getwd(), files_to_delete))
 })
-    
-  
-  
-  
+
+
+
+
   observeEvent(input$confirmFile, {
     #This is the main bulk of the code
     #All calculations and mutations of the data occur in this block.
@@ -228,7 +232,7 @@ output$confirmKey <-downloadHandler(
       progress$set(message = "Preparing Data", value = 0)
       # Close the progress when this reactive exits (even if there's an error)
       on.exit(progress$close())
-      
+
       updateProgress <- function(value = NULL,
                                  detail = NULL) {
         if (is.null(value)) {
@@ -237,7 +241,7 @@ output$confirmKey <-downloadHandler(
         }
         progress$set(value = value, detail = detail)
       }
-      
+
       #Variable Declaration
       #These variables are non reactive meaning they can not be called
       #outside of this observeEvent. Reactive variables are cast to the
@@ -276,7 +280,7 @@ output$confirmKey <-downloadHandler(
               i,
               as.integer(intensity()),
               as.integer(lfq()),
-              as.integer(cutoff()),
+
               as.integer(file_type()),
               updateProgress
             )
@@ -291,27 +295,28 @@ output$confirmKey <-downloadHandler(
                           cohorts[j],
                           as.integer(std()),
                           updateProgress)
-            
+
           }
           else{
             next
           }
-          
+
           #Determines what proteins are usable for a t-test and then removes
           #those that do not have 2 or more entries.
+          browser()
 
           possible <-
             cohort_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
                                                                                          cohort1 = sum(!is.na(get(cohorts[j])))) %>%
-            mutate(possible = ifelse(ctr < 2 |
-                                       cohort1 < 2, FALSE, TRUE)) %>%
+            mutate(possible = ifelse(ctr <  as.integer(ctr_cutoff()) |
+                                       cohort1 < as.integer(case_cutoff()), FALSE, TRUE)) %>%
             filter(possible)
-          
+
           cohort_df <-
             cohort_df %>% filter(Protein %in% possible$Protein)
           cohort_df$Intensity <- log2(cohort_df$Intensity)
-          
-          
+
+
           if (parametric_type == 0) {
             statisical_test <-
               getMannWhit(cohort_df, p_cutoff(), updateProgress)
@@ -319,17 +324,17 @@ output$confirmKey <-downloadHandler(
           else{
             statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
           }
-          
+
           temp <-  anti_join(cohort_df, temp, by = "Protein")
           less_than_two <- rbind(less_than_two, temp)
           comparative_combined <-
             rbind(comparative_combined, statisical_test)
         }
       }
-      
-      
-      
-      
+
+
+
+
       #Adds file name to data for coloring
       file_names <- unique(comparative_combined$File)
       #Plotting loop
@@ -337,14 +342,14 @@ output$confirmKey <-downloadHandler(
       #Essentially the same loop except one has the inclusion of a color palet
       #and choses the color according to the filename
       if (comparative() == 0) {
-     
+
         leftovers <-
           anti_join(statisical_test, fasta, by = "Protein.ID")
-        
+
         statisical_test %<>% inner_join(fasta,
                                         by = c("Protein.ID", "Gene"),
                                         multiple = "all") %>% arrange(Protein.ID)
-        
+
         located_peptides(locatePeptides(statisical_test, updateProgress))
 
         protein_id_loop <-  unique(statisical_test$Protein.ID)
@@ -362,19 +367,19 @@ output$confirmKey <-downloadHandler(
             multiple = "all"
           ))
           protein_length <- unique(nchar(filtered_results()$x))
-          
+
           protein_plot[[i]] = plotting_protein() %>%
-            
+
             #Lets make a column based on significance
             mutate(isSignificant = ifelse(filtered_results()$p.adj < p_cutoff(), "yes", "no")) %>%
-            
+
             #Start plotting
             ggplot() +
-            
+
             #We take here the 'mean' but this is of course X-times the same value
             scale_y_continuous(limits = c(NA, NA)) +
             xlim(0, protein_length + 1) +
-            
+
             #Create some lines to help visualise the start and end of the protein.
             geom_vline(xintercept = 0,
                        lwd = 2,
@@ -382,10 +387,10 @@ output$confirmKey <-downloadHandler(
             geom_vline(xintercept = protein_length + 1,
                        lwd = 2,
                        alpha = 0.5) +
-            
+
             #set a horizontal line to inform about FC = 0
             geom_hline(yintercept = 0, color = "black") +
-            
+
             #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
             geom_rect(
               inherit.aes = FALSE,
@@ -399,22 +404,22 @@ output$confirmKey <-downloadHandler(
                 ymin = filtered_results()$FC - 0.05,
                 ymax = filtered_results()$FC + 0.05,
                 fill = isSignificant
-                
+
               ),
-              
+
               #Here I specify some stuff that will be universal for all blocks irrespective of column info.
               col = "black",
               alpha = 0.75,
               linewidth = .15,
             ) +
-            
+
             #Set the Ggplot theme, limit the y-axis for FC.
             theme_bw() +
-            
+
             #Specify the colours I want to use for the isSignificant column
             scale_color_manual(values = c("yes" = "black", "no" = "red")) +
             theme(legend.position = "bottom") +
-            
+
             #x and yaxis titles
             xlab("Protein Sequence") +
             ylab("FC") +
@@ -468,7 +473,7 @@ output$confirmKey <-downloadHandler(
           protein_length <- unique(nchar(filtered_results()$x))
           plotting_protein(
             plotting_protein() %>%
-              
+
               #Lets make a column based on significance
               mutate(
                 isSignificant = ifelse(filtered_results()$p.adj < p_cutoff(), "yes", "no")
@@ -478,7 +483,7 @@ output$confirmKey <-downloadHandler(
               darken(plotting_protein()$color, 0.4),
               lighten(plotting_protein()$color, 0.2)
             ))
-            
+
             %>% mutate(
               File = ifelse(
                 isSignificant == "yes",
@@ -487,18 +492,18 @@ output$confirmKey <-downloadHandler(
               )
             )
           )
-          
+
           # names(pal_temp) <- colors$Cohort
           # pal(pal_temp)
           protein_plot[[i]] = plotting_protein() %>%
-            
+
             #Start plotting
             ggplot() +
-            
+
             #We take here the 'mean' but this is of course X-times the same value
             scale_y_continuous(limits = c(NA, NA)) +
             xlim(0, protein_length + 1) +
-            
+
             #Create some lines to help visualise the start and end of the protein.
             geom_vline(xintercept = 0,
                        lwd = 2,
@@ -506,14 +511,14 @@ output$confirmKey <-downloadHandler(
             geom_vline(xintercept = protein_length + 1,
                        lwd = 2,
                        alpha = 0.5) +
-            
+
             #set a horizontal line to inform about FC = 0
             geom_hline(yintercept = 0, color = "black") +
-            
+
             #Here we build the peptide "blocks". Do note that all column-info goes INSIDE the aes() part.
             geom_rect(
               #Here I specify some stuff that will be universal for all blocks irrespective of column info.
-              
+
               aes(
                 xmin = plotting_protein()$start_seq,
                 xmax = (
@@ -528,12 +533,12 @@ output$confirmKey <-downloadHandler(
               ),
               alpha = 0.75,
               linewidth = .25,
-              
+
             ) +
-            
+
             #Set the Ggplot theme, limit the y-axis for FC.
             theme_bw() +
-            
+
             #Specify the colours I want to use for the isSignificant column
             scale_fill_identity("File",
                                 labels = setNames(
@@ -548,7 +553,7 @@ output$confirmKey <-downloadHandler(
             #x and yaxis titles
             xlab("Protein Sequence") +
             ylab("FC") +
-            
+
             labs(
               subtitle = paste0(
                 as.character(i),
@@ -561,7 +566,7 @@ output$confirmKey <-downloadHandler(
             )
         }
       }
-      
+
       #Reactive Variables
       #Variables that are used in the other obbserveEvent for the plot
       #downloads and in browser previews.
@@ -572,12 +577,12 @@ output$confirmKey <-downloadHandler(
         if (comparative() == 0) {
           temp_id <- as.data.frame(unique(statisical_test$Protein.ID))
           final_dataframe(located_peptides())
-          
+
         }
         else{
           temp_id <- as.data.frame(unique(comparative_combined$Protein.ID))
           final_dataframe(located_peptides())
-          
+
         }
         colnames(temp_id) <- c("Protein.ID")
         protein_ids(temp_id)
@@ -589,15 +594,15 @@ output$confirmKey <-downloadHandler(
       less_than(less_than_two)
       final_dataframe(located_peptides())
       ######
-      
-      
+
+
       shinyjs::enable("previousPlot")
       shinyjs::enable("nextPlot")
-      
+
       shinyjs::enable("downloadPlot")
-      
+
     },
-    
+
     error = function(err) {
       showNotification(
         paste0(
@@ -606,9 +611,9 @@ output$confirmKey <-downloadHandler(
         type = 'err'
       )
     }, silent = TRUE)
-    
-    
-    
+
+
+
   })
   #Download
   #Used to download the files from the plotting loop. Can choose between two
@@ -631,7 +636,7 @@ output$confirmKey <-downloadHandler(
               by  = c('Protein.ID', 'x', 'Gene', 'info'),
               multiple = "all"
             ))
-            
+
             protein_length <- unique(nchar(filtered_results()$x))
             ggsave(
               paste(
@@ -647,7 +652,7 @@ output$confirmKey <-downloadHandler(
           }
         }
       }
-      
+
       else{
         for (i in unique(protein_ids()$Protein.ID)) {
           plotting_protein(filter(located_peptides(), Protein.ID == i))
@@ -659,7 +664,7 @@ output$confirmKey <-downloadHandler(
               by  = c('Protein.ID', 'x', 'Gene', 'info'),
               multiple = "all"
             ))
-            
+
             protein_length <- unique(nchar(filtered_results()$x))
             ggsave(
               paste(
@@ -675,7 +680,7 @@ output$confirmKey <-downloadHandler(
           }
         }
       }
-      
+
       write.csv(final_dataframe()
                 , file = "final_dataframe.csv"
                 , row.names = F)
@@ -689,25 +694,25 @@ output$confirmKey <-downloadHandler(
                 file = "removed_proteins_less_two.csv"
                 ,
                 row.names = F)
-      
+
       zip_files <-
         list.files(path = getwd(), pattern = ".svg$|.csv$|.png$")
-      
+
       zip::zip(file, files = zip_files)
       files_to_delete <-
         dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
       file.remove(file.path(getwd(), files_to_delete))
-      
+
     }
-    
+
   )
-  
-  
+
+
   #Next and Previous
-  #Essentially the same logic between the two of them with the index of 
+  #Essentially the same logic between the two of them with the index of
   #the dataframe being incremented by 1 if clicking next or decremented by
   #1 if previous is clicked. These display the plots from the loop in browser.
-  
+
   observeEvent(input$nextPlot, {
     plots <- as.list(protein_plotr())
     uniprot_ids <- as.data.frame(uniprot())
@@ -716,7 +721,7 @@ output$confirmKey <-downloadHandler(
       if (j() < nrow(uniprot_ids)) {
         output$plot <- renderUI({
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-       
+
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -727,7 +732,7 @@ output$confirmKey <-downloadHandler(
           ))
 
           protein_length <- unique(nchar(filtered_results()$x))
-        
+
           renderPlot({
             plots[[i]]
           })
@@ -745,7 +750,7 @@ output$confirmKey <-downloadHandler(
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
           renderPlot({
             plots[[i]]
@@ -758,7 +763,7 @@ output$confirmKey <-downloadHandler(
       if (j() < nrow(protein_ids())) {
         output$plot <- renderUI({
           i <-  unique(protein_ids()[j(), 'Protein.ID'])
-          
+
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -775,12 +780,12 @@ output$confirmKey <-downloadHandler(
           })
         })
         j(j() + 1)
-        
+
       }
       else {
         output$plot <- renderUI({
           i <-  unique(protein_ids()[j(), 'Protein.ID'])
-          
+
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -789,7 +794,7 @@ output$confirmKey <-downloadHandler(
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
           renderPlot({
             plots[[i]]
@@ -799,7 +804,7 @@ output$confirmKey <-downloadHandler(
       }
     }
   })
-  
+
   observeEvent(input$previousPlot, {
     plots <- as.list(protein_plotr())
     uniprot_ids <- as.data.frame(uniprot())
@@ -816,20 +821,20 @@ output$confirmKey <-downloadHandler(
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
           renderPlot({
             plots[[i]]
           })
-          
+
         })
         j(j() - 1)
-        
+
       }
       else {
         output$plot <- renderUI({
           i <-  unique(uniprot_ids[j(), 'Protein.ID'])
-          
+
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -838,7 +843,7 @@ output$confirmKey <-downloadHandler(
             by  = c('Protein.ID', 'x', 'Gene', 'info'),
             multiple = "all"
           ))
-          
+
           protein_length <- unique(nchar(filtered_results()$x))
 
           renderPlot({
@@ -846,7 +851,7 @@ output$confirmKey <-downloadHandler(
           })
         })
         j(1)
-        
+
       }
     }
     else{

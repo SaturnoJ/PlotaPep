@@ -22,7 +22,7 @@ cleanData <-
   function(df,
            intensity,
            lfq,
-           cutoff,file_type,
+           file_type,
            updateProgress = NULL) {
     if (is.function(updateProgress)) {
       text <- "Cleaning Data"
@@ -33,20 +33,20 @@ cleanData <-
     df <-  subset(df, select=-c(File))
     if(file_type == 2){
       cleaned_df <-
-        diannCleaner(df, cutoff)
+        diannCleaner(df)
       
       }
     else if(file_type == 1){
       cleaned_df <-
-        fraggerCleanerIon(df, intensity, lfq, cutoff)
+        fraggerCleanerIon(df, intensity, lfq, )
     }
     else if(file_type == 3){
       cleaned_df <-
-        genericCleaner(df, cutoff)
+        genericCleaner(df)
     }
     else{
       cleaned_df <-
-        fraggerCleaner(df, intensity, lfq, cutoff)
+        fraggerCleaner(df, intensity, lfq)
     }
     if (is.function(updateProgress)) {
       text <- "Data Cleaned"
@@ -59,7 +59,7 @@ cleanData <-
     return(as.data.frame(cleaned_df))
   }
 
-diannCleaner <-function(df, cutoff){
+diannCleaner <-function(df ){
   
   #combine the ProteinGroup and Genes
  df <-
@@ -90,8 +90,6 @@ diannCleaner <-function(df, cutoff){
   
   #apply cutoff on the protein level
 
-  df <-
-    purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
   
   #Long Format it
   df <- setDT(df, keep.rownames = "Sample")
@@ -109,7 +107,7 @@ diannCleaner <-function(df, cutoff){
   
 
 fraggerCleanerIon <-
-  function(df, intensity, lfq, cutoff) {
+  function(df, intensity, lfq) {
     # change Protein name
     if (grep('Peptide Sequence', names(df))) {
       names(df)[names(df) == 'Peptide Sequence'] <-
@@ -182,10 +180,7 @@ fraggerCleanerIon <-
     
     
     #apply cutoff on the protein level
-    
-    df <-
-      purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
-    
+   
     
     #Long Format it
     df <- setDT(df, keep.rownames = "Sample")
@@ -198,7 +193,7 @@ fraggerCleanerIon <-
   }
 
 fraggerCleaner <-
-  function(df, intensity, lfq, cutoff) {
+  function(df, intensity, lfq) {
     # change Protein name
     if (grep('Peptide Sequence', names(df))) {
       names(df)[names(df) == 'Peptide Sequence'] <-
@@ -266,10 +261,6 @@ fraggerCleaner <-
     
     
     
-    #apply cutoff on the protein level
-    
-    df <-
-      purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
     
     
     #Long Format it
@@ -283,7 +274,7 @@ fraggerCleaner <-
   }
 
 
-genericCleaner <-function(df, cutoff){
+genericCleaner <-function(df){
 
   #combine the ProteinGroup and Genes
   df <-
@@ -306,9 +297,7 @@ genericCleaner <-function(df, cutoff){
   
   
   #apply cutoff on the protein level
-  
-  df <-
-    purrr::discard(df, ~ sum(is.na(.x)) / length(.x) * 100 >= (100 - cutoff))
+ 
   
   #Long Format it
   df <- setDT(df, keep.rownames = "Sample")

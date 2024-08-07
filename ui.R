@@ -109,17 +109,24 @@ ui <- navbarPage(
         ),
         radioButtons("lfqInput", "Select LFQ Type : ", c("None" = 1, "Max" = 0)),
         numericInput(
-          "cutoffInput",
-          "Select Cutoff : ",
-          0,
-          min = 0,
+          "ctr_cutoffInput",
+          "Select Control Cutoff : ",
+          3,
+          min = 2,
+          max = 100
+        ),
+        numericInput(
+          "case_cutoffInput",
+          "Select Case Cutoff : ",
+          3,
+          min = 2,
           max = 100
         ),
         textInput("ctrInput",
-                  "Input control identifier : ",
+                  "Input Control Identifier : ",
                   placeholder = "Example CTR, AD, DLB etc."),
         textInput("cohortInput",
-                  "Input cohort identifiers : ",
+                  "Input Case Identifiers : ",
                   
                   placeholder = "Example AD, DLB etc."),
         radioButtons(
