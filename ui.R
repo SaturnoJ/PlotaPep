@@ -4,77 +4,58 @@ library(shinydisconnect)
 library(shinyBS)
 library(tippy)
 library(shinythemes)
+library(DT)
 
 ui <- navbarPage(
   "PlotaPep",
   theme = shinytheme("flatly"),
   useShinyjs(),
+########
   tabPanel(
     "Key Input",
     mainPanel(fluidRow(box(
       fileInput(
         "originalInput",
-        "Input original file to be renamed : ",
+        "Input output file from database search tools to be renamed : ",
         multiple = FALSE,
         accept =c("csv",
                   "comma-separated-values",
                   ".csv",
-                  ".tsv"),
+                  ".tsv",".txt"),
         # close c
         buttonLabel = "Browse...",
-        placeholder = "No FASTA Selected"
-      ), 
-      fileInput(
-        "keyInput",
-        "Choose key file : ",
-        multiple = FALSE,
-        accept =c("csv",
-                  "comma-separated-values",
-                  ".csv",
-                  ".tsv"),
-        buttonLabel = "Browse...",
-        placeholder = "No original selected"
+        placeholder = "No Original Selected"
       ),
+
       downloadButton("confirmKey", "Run Key"),
-      
-    )),
-    fluidRow(
-      bsTooltip(
-        id = "keyInput",
-        title = "This is an input",
-        placement = "right",
-        trigger = "manual"
-      ),
-    )),
+      DTOutput('tableInput')
+    ))),
     fluidRow(column(4, wellPanel(
       p("How to use:"),
       p(
-        " 1. Choose File that needs its sample names unobscured"
+        " 1. Choose file that needs its sample names unobscured. This can be any output file such as report.pr_matrix, combined_peptide, combined_modified, etc."
       ),
       p(
-        " 2. Input Key file that contains two columns one with the sample names and the other with the cohort names"
+        " 2. Put new names into table below. Press CTRL-Enter to save the values."
       ),
       p(
         " 3. Run then download"
       )
     )))
   ),
+#########
 
-  
-  
+#######
   tabPanel("File Input", (mainPanel(
     fluidRow(
-      box(
+     shinydashboard::box(
         fileInput(
           "fastaInput",
           "Choose FASTA file : ",
           multiple = FALSE,
-          accept = c("csv",
-                     "comma-separated-values",
-                     ".csv",
-                     ".tsv",".fasta",".FASTA"),
+          accept = c(".fasta",".FASTA"),
           buttonLabel = "Browse...",
-          placeholder = "No original selected"
+          placeholder = "No FASTA selected"
         )
         ,
         fileInput(
@@ -122,12 +103,19 @@ ui <- navbarPage(
           min = 2,
           max = 100
         ),
+        numericInput(
+          "peptide_minInput",
+          "Select Min Peptide Amount for Plots : ",
+          3,
+          min = 1,
+          max = 100
+        ),
         textInput("ctrInput",
                   "Input Control Identifier : ",
                   placeholder = "Example CTR, AD, DLB etc."),
-        textInput("cohortInput",
+        textInput("caseInput",
                   "Input Case Identifiers : ",
-                  
+
                   placeholder = "Example AD, DLB etc."),
         radioButtons(
           "parametricInput",
@@ -155,18 +143,18 @@ ui <- navbarPage(
         numericInput(
           "stdInput",
           "Select standard deviations : ",
-          2,
+          4,
           min = 2,
           max = 6
         ),
         actionButton("confirmFile", "Run Plotter"),
       )
-      
+
     ),
     fluidRow(
       bsTooltip(
-        id = "cohortInput",
-        title = "Input cohort identifier from your file input. These should the renamed combined_peptide.tsv from msfragger.",
+        id = "caseInput",
+        title = "Input case identifier from your file input. These are sample names from the file. Be specific i.e. Old_AD or Young_AD if multiple cases have similar names.",
         placement = "right",
         trigger = "hover"
       ),
@@ -189,15 +177,33 @@ ui <- navbarPage(
         trigger = "hover"
       ),
       bsTooltip(
-        id = "cutoffInput",
-        title = "This is an input",
+        id = "file_typeInput",
+        title = "This can be any output file such as report.pr_matrix, combined_peptide, combined_modified, etc.",
         placement = "right",
         trigger = "hover"
       ),
-      
+
       bsTooltip(
         id = "ctrInput",
         title = "Input control identifier from your file input. This will determine how the fold change is plotted",
+        placement = "right",
+        trigger = "hover"
+      ),
+
+      bsTooltip(
+        id = "ctr_cutoffInput",
+        title = "Amount of control values needed for a protein to be used for statistical test. Min = 2",
+        placement = "right",
+        trigger = "hover"
+      ),  bsTooltip(
+        id = "case_cutoffInput",
+        title = "Amount of case values needed for a protein to be used for statistical test. Min = 2",
+        placement = "right",
+        trigger = "hover"
+      ),
+      bsTooltip(
+        id = "peptide_minInput",
+        title = "Set min value for peptides to be plotted. If the amount of peptides is less than specified number they will not be plotted.",
         placement = "right",
         trigger = "hover"
       ),
@@ -209,11 +215,11 @@ ui <- navbarPage(
       ),
       bsTooltip(
         id = "comparativeInput",
-        title = "Takes two or more cohorts performs independent ttest on each and plot them to the same plot for direct comparison.",
+        title = "Takes two or more cases performs independent ttest on each and plot them to the same plot for direct comparison.",
         placement = "right",
         trigger = "hover"
       ),
-      
+
       bsTooltip(
         id = "pInput",
         title = "Choose max p-value for statisical significance",
@@ -241,18 +247,18 @@ ui <- navbarPage(
         " 3. Select file output type. Currently supported MSFragger combined peptide with and without modifications and DIANN pr.matrix."
       ),
       p(
-        " 4. Set cohorts to be plotted, the cohort set for the control is what fold change will be based off of."
+        " 4. Set cases to be plotted, the case set for the control is what fold change will be based off of."
       ),
       p(" 5. Set other options to preference then run."),
       p(" 6. Use the text input above the plots to search for specific plots.")
     )
   ))),
-  
+############
   tabPanel(
     "Plot Output",
-    
+
     mainPanel(fluidRow(
-      box(
+     shinydashboard::box(
         disabled(
           downloadButton('downloadPlot', "Download Plots and Final Data Table")
         ),
@@ -271,7 +277,7 @@ ui <- navbarPage(
           ),
           value = NULL
         ),
-        
+
       )
     )),
     fluidRow(
@@ -284,4 +290,139 @@ ui <- navbarPage(
     ),
     fluidRow(uiOutput("plot"))
   ),
+
+  tabPanel(
+    "PCA Output",
+
+    mainPanel(
+
+    fluidRow(
+     shinydashboard::box(
+
+        fileInput(
+          "fileInput",
+          "Choose file : ",
+          multiple = TRUE,
+          accept = c("csv",
+                     "comma-separated-values",
+                     ".csv",
+                     ".tsv",".txt"),
+          buttonLabel = "Browse...",
+          placeholder = "No Files Selected"
+        ),
+        radioButtons(
+          "file_typeInput",
+          "Select Search Output Type : ",
+          c(
+            "MSFragger No modifications " = 0,
+            "MSFragger Modified/Ion" = 1,
+            "DIA-NN" = 2,
+            "Generic Dataframe" = 3
+          )
+        ),
+        radioButtons(
+          "intensityInput",
+          "Select Intensity : ",
+          c(
+            "Intensity" = 0,
+            "Total" = 1,
+            "Unique" = 2
+          )
+        ),
+
+
+        textInput("conditionAInput",
+                  "Input A Conditions : ",
+                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("conditionBInput",
+                  "Input B Condition : ",
+
+                  placeholder = "Example AD, DLB, F_9, etc."),
+        textInput("labelAInput",
+                  "Input A Label : ",
+                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("labelBInput",
+                  "Input B Label : ",
+
+                  placeholder = "Example AD, DLB, F_9, etc."),
+
+
+
+
+        actionButton("confirmPCA", "Run Plotter"),
+
+      ),
+
+
+    fluidRow(uiOutput("pcaPlot"))
+  ))),
+
+
+tabPanel(
+  "Volcano Output",
+
+  mainPanel(
+
+    fluidRow(
+     shinydashboard::box(
+
+        fileInput(
+          "fileInput",
+          "Choose file : ",
+          multiple = TRUE,
+          accept = c("csv",
+                     "comma-separated-values",
+                     ".csv",
+                     ".tsv",".txt"),
+          buttonLabel = "Browse...",
+          placeholder = "No Files Selected"
+        ),
+        radioButtons(
+          "file_typeInput",
+          "Select Search Output Type : ",
+          c(
+            "MSFragger No modifications " = 0,
+            "MSFragger Modified/Ion" = 1,
+            "DIA-NN" = 2,
+            "Generic Dataframe" = 3
+          )
+        ),
+        radioButtons(
+          "intensityInput",
+          "Select Intensity : ",
+          c(
+            "Intensity" = 0,
+            "Total" = 1,
+            "Unique" = 2
+          )
+        ),
+
+
+        textInput("conditionAInput",
+                  "Input A Conditions : ",
+                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("conditionBInput",
+                  "Input B Condition : ",
+
+                  placeholder = "Example AD, DLB, F_9, etc."),
+        textInput("labelAInput",
+                  "Input A Label : ",
+                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("labelBInput",
+                  "Input B Label : ",
+
+                  placeholder = "Example AD, DLB, F_9, etc."),
+
+
+
+
+        actionButton("confirmVol", "Run Plotter"),
+
+      ),
+
+
+      fluidRow(uiOutput("volPlot"))
+    )))
+
+
 )

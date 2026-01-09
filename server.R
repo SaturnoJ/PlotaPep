@@ -16,6 +16,7 @@ library(data.table)
 library(magrittr)
 library(shinydisconnect)
 library("colorspace")
+library(DT)
 
 source("functions.R", local = T)
 
@@ -34,14 +35,14 @@ server <- function(input, output, session) {
   ctr_cutoff <- reactiveVal()
   case_cutoff <- reactiveVal()
   protein_ids <- reactiveVal()
-  j <- reactiveVal(1)
+  plot_increment <- reactiveVal(1)
   located_peptides <- reactiveVal()
   plotting_protein <- reactiveVal()
   filtered_results <- reactiveVal()
   protein_plotr <- reactiveVal()
   filtered_results <- reactiveVal()
   plot_fasta <- reactiveVal()
-  cohort_name <- reactiveVal()
+  case_name <- reactiveVal()
   parametric <- reactiveVal()
   ctr_name <- reactiveVal()
   final_dataframe <- reactiveVal()
@@ -56,7 +57,13 @@ server <- function(input, output, session) {
   less_than <- reactiveVal()
   file_type <- reactiveVal()
   original <- reactiveVal()
-  key_file <- reactiveVal()
+  peptide_min <- reactiveVal()
+  new_names <- reactiveVal()
+  labelA <- reactiveVal()
+  labelB <- reactiveVal()
+  conditionA <- reactiveVal()
+  conditionB <- reactiveVal()
+  genes <- reactiveVal()
   #######
 
   #Inputs for each tab on the UI
@@ -84,25 +91,31 @@ server <- function(input, output, session) {
     for (i in 1:nrow(files)) {
       df[[i]] <-
         as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
-      df[[i]]$File <- str_sub(files$name[i], end = -5)
 
     }
-    original(df)
+    original(as.data.frame(df))
+    df <- as.data.frame(df)
+    df <- df[-c(1:14, length(df))]
+    names(df) <- gsub('\\..*', '', names(df))
+    file_names <- as.data.frame(unique(names(df)))
+    names(file_names) <- "Old Names"
+    file_names[, 'New Names'] <- NA
+
+    new_names(as.data.frame(file_names))
+    output$tableInput <- DT::renderDT(
+      file_names,
+      server = TRUE,
+      selection = list(target = 'cell', disable = list(columns = c(1, 2))),
+      editable = "column",
+      options = list(pageLength = 150)
+    )
 
   })
-  observeEvent(input$keyInput, {
-    files <- input$keyInput
-    df <- list()
-    for (i in 1:nrow(files)) {
-      df[[i]] <-
-        as.data.frame(read_delim(files$datapath[i], show_col_types = FALSE))
-            df[[i]]$File <- str_sub(files$name[i], end = -5)
-
-
-    }
-    key_file(df)
-
+  observeEvent(input$tableInput_cell_edit, {
+    new_names(editData(new_names(), input$tableInput_cell_edit, 'tableInput'))
   })
+
+
   #File Inputs
 
 
@@ -149,6 +162,10 @@ server <- function(input, output, session) {
     case_cutoff(input$case_cutoffInput)
 
   })
+  observeEvent(input$peptide_minInput, {
+    peptide_min(input$peptide_minInput)
+
+  })
   observeEvent(input$pInput, {
     p_cutoff(input$pInput)
 
@@ -175,12 +192,13 @@ server <- function(input, output, session) {
 
   })
 
-  observeEvent(input$cohortInput, {
-    name_temp <- input$cohortInput
+  observeEvent(input$caseInput, {
+    name_temp <- input$caseInput
     name_temp <- strsplit(name_temp, ", |,| , ")
-    cohort_name(unlist(name_temp))
+    case_name(unlist(name_temp))
 
   })
+
 
   observeEvent(input$colorsInput, {
     colors_temp <- input$colorsInput
@@ -191,31 +209,36 @@ server <- function(input, output, session) {
 
   #########
 
-output$confirmKey <-downloadHandler(
+  output$confirmKey <- downloadHandler(
+    filename = function() {
+      paste0("tsv_renamed.csv", sep =
+               "")
 
-  filename=function(){
-    paste0(unique(as.character(original()[[1]]$File)),"_keymatched.csv",sep="")
+    },
 
-  },
-  content = function(file){
-    #Two inputted dataframes, original which has obfuscated cohorts and
-    #the key for the obfuscated cohorts
+    content = function(file) {
+      #Two inputted dataframes, original which has obfuscated cases and
+      #the key for the obfuscated cases
 
-    original <- original()[[1]]
-    key_file <- key_file()[[1]]
-    key_file <-key_file[complete.cases(key_file),]
-    key_file <- key_file[!duplicated(key_file), ]
+      original <- original()
+      new_names <- new_names()
+      new_names <- new_names[complete.cases(new_names), ]
+      new_names <- new_names[!duplicated(new_names), ]
 
-    for(i in 1:nrow(key_file)){
-      colnames(original)[key_file$Sample[i]==colnames(original)] <- key_file$Cohort[i]
+      for (i in 1:nrow(new_names)) {
+        if (new_names$`New Names`[i] != '')
+          colnames(original) <- str_replace(colnames(original),
+                                            new_names$`Old Names`[i],
+                                            new_names$`New Names`[i])
 
+      }
+
+      write.csv(original, file)
+      files_to_delete <-
+        dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
+      file.remove(file.path(getwd(), files_to_delete))
     }
-
-    write.csv(original,file)
-    files_to_delete <-
-      dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
-    file.remove(file.path(getwd(), files_to_delete))
-})
+  )
 
 
 
@@ -252,7 +275,7 @@ output$confirmKey <-downloadHandler(
       uniprot_ids <- as.data.frame(uniprot())
       colnames(uniprot_ids)  <- c("Protein.ID")
       protein_plot <- list()
-      cohorts <- toupper(cohort_name())
+      cases <- toupper(case_name())
       parametric_type <- parametric()
       ctr <- toupper(ctr_name())
       protein_id_loop <- list
@@ -271,8 +294,9 @@ output$confirmKey <-downloadHandler(
       #This portion of the code reads in the uploaded data files
       #and starts the processing of the data. This section creates the final
       #dataframe that is used for plotting.
+      #
       for (i in df) {
-        for (j in 1:length(cohorts)) {
+        for (plot_increment in 1:length(cases)) {
           #This takes in the initial dataframe and then mutates it to a long
           #format making it more easily used for statistical calculations.
           temp <-
@@ -284,17 +308,17 @@ output$confirmKey <-downloadHandler(
               as.integer(file_type()),
               updateProgress
             )
-          #Unifying the cases of the cohort and sample names, then splitting the
-          #data into cohorts based on the inputted cohort vs the sample name.
+          #Unifying the cases of the case and sample names, then splitting the
+          #data into cases based on the inputted case vs the sample name.
           temp[, 1] <- toupper(temp[, 1])
 
-          if (!isEmpty(temp[temp$Sample %like% toupper(cohorts[j]), ])) {
-            cohort_df <-
-              cohortSplit(temp,
-                          ctr,
-                          cohorts[j],
-                          as.integer(std()),
-                          updateProgress)
+          if (!isEmpty(temp[temp$Sample %like% toupper(cases[plot_increment]), ])) {
+            case_df <-
+              caseSplit(temp,
+                        ctr,
+                        cases[plot_increment],
+                        as.integer(std()),
+                        updateProgress)
 
           }
           else{
@@ -303,36 +327,40 @@ output$confirmKey <-downloadHandler(
 
           #Determines what proteins are usable for a t-test and then removes
           #those that do not have 2 or more entries.
-          browser()
-
           possible <-
-            cohort_df %>%  spread(Cohort, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
-                                                                                         cohort1 = sum(!is.na(get(cohorts[j])))) %>%
-            mutate(possible = ifelse(ctr <  as.integer(ctr_cutoff()) |
-                                       cohort1 < as.integer(case_cutoff()), FALSE, TRUE)) %>%
+            case_df %>%  spread(Case, Intensity) %>% group_by(Protein) %>% summarise(ctr = sum(!is.na(get("CTR"))),
+                                                                                     case1 = sum(!is.na(get(cases[plot_increment])))) %>%
+            mutate(possible = ifelse(
+              ctr <  as.integer(ctr_cutoff()) |
+                case1 < as.integer(case_cutoff()),
+              FALSE,
+              TRUE
+            )) %>%
             filter(possible)
 
-          cohort_df <-
-            cohort_df %>% filter(Protein %in% possible$Protein)
-          cohort_df$Intensity <- log2(cohort_df$Intensity)
+          case_df <-
+            case_df %>% filter(Protein %in% possible$Protein)
+          case_df$Intensity <- log2(case_df$Intensity)
 
 
           if (parametric_type == 0) {
             statisical_test <-
-              getMannWhit(cohort_df, p_cutoff(), updateProgress)
+              getMannWhit(case_df, p_cutoff(), updateProgress)
           }
           else{
-            statisical_test <- getTtest(cohort_df, p_cutoff(), updateProgress)
+            statisical_test <- getTtest(case_df, p_cutoff(), updateProgress)
           }
-
-          temp <-  anti_join(cohort_df, temp, by = "Protein")
-          less_than_two <- rbind(less_than_two, temp)
-          comparative_combined <-
-            rbind(comparative_combined, statisical_test)
+          seperated_proteins <-  anti_join(case_df, temp, by = c("Protein", "Sample"))
+          less_than_two <- rbind(less_than_two, seperated_proteins)
+          comparative_combined <- rbind(comparative_combined, statisical_test)
         }
       }
+      min_removed <- comparative_combined  %>% group_by(Protein.ID, Peptide) %>% summarise() %>% unique() %>% filter (n() >= as.integer(peptide_min()))
+      if (is.na(min_removed)) {
 
-
+      }
+      comparative_combined <-
+        comparative_combined %>% filter(Protein.ID %in% min_removed$Protein.ID)
 
 
       #Adds file name to data for coloring
@@ -342,17 +370,18 @@ output$confirmKey <-downloadHandler(
       #Essentially the same loop except one has the inclusion of a color palet
       #and choses the color according to the filename
       if (comparative() == 0) {
-
         leftovers <-
-          anti_join(statisical_test, fasta, by = "Protein.ID")
+          anti_join(comparative_combined,
+                    fasta,
+                    by = c('Protein.ID', "Gene"))
 
-        statisical_test %<>% inner_join(fasta,
-                                        by = c("Protein.ID", "Gene"),
-                                        multiple = "all") %>% arrange(Protein.ID)
+        comparative_combined %<>% inner_join(fasta,
+                                             by = c("Protein.ID", "Gene"),
+                                             multiple = "all") %>% arrange(Protein.ID)
 
-        located_peptides(locatePeptides(statisical_test, updateProgress))
+        located_peptides(locatePeptides(comparative_combined, updateProgress))
 
-        protein_id_loop <-  unique(statisical_test$Protein.ID)
+        protein_id_loop <-  unique(comparative_combined$Protein.ID)
         for (i in protein_id_loop) {
           if (is.function(updateProgress)) {
             text <- "Plotting Peptides"
@@ -417,7 +446,7 @@ output$confirmKey <-downloadHandler(
             theme_bw() +
 
             #Specify the colours I want to use for the isSignificant column
-            scale_color_manual(values = c("yes" = "black", "no" = "red")) +
+            scale_fill_manual(values = c("yes" = "blue", "no" = "red")) +
             theme(legend.position = "bottom") +
 
             #x and yaxis titles
@@ -428,7 +457,7 @@ output$confirmKey <-downloadHandler(
                 as.character(i),
                 " p == ",
                 p_cutoff(),
-                " Standard Deviations ==",
+                " Standard Deviations == ",
                 std()
               ),
               title = as.character(filtered_results()$Gene)
@@ -436,7 +465,6 @@ output$confirmKey <-downloadHandler(
         }
       }
       else{
-
         leftovers <-
           anti_join(comparative_combined,
                     fasta,
@@ -451,10 +479,11 @@ output$confirmKey <-downloadHandler(
                                                  File == as.character(file_names[4]) ~ as.character(colors_df[4])
                                                )
                                              )
+
         located_peptides(locatePeptides(comparative_combined, updateProgress))
-        colors <- distinct(comparative_combined, Cohort, colors)
+        colors <- distinct(comparative_combined, Case, colors)
         pal_temp <- colors$color
-        names(pal_temp) <- colors$Cohort
+        names(pal_temp) <- colors$Case
         pal(pal_temp)
         protein_id_loop <-  unique(comparative_combined$Protein.ID)
         if (is.function(updateProgress)) {
@@ -493,7 +522,7 @@ output$confirmKey <-downloadHandler(
             )
           )
 
-          # names(pal_temp) <- colors$Cohort
+          # names(pal_temp) <- colors$Case
           # pal(pal_temp)
           protein_plot[[i]] = plotting_protein() %>%
 
@@ -559,7 +588,7 @@ output$confirmKey <-downloadHandler(
                 as.character(i),
                 " p == ",
                 p_cutoff(),
-                " Standard Deviations ==",
+                " Standard Deviations == ",
                 std()
               ),
               title = as.character(filtered_results()$Gene)
@@ -573,9 +602,8 @@ output$confirmKey <-downloadHandler(
       protein_plotr(protein_plot)
       plot_fasta(fasta)
       if (nrow(uniprot_ids) == 0) {
-        # browser()
         if (comparative() == 0) {
-          temp_id <- as.data.frame(unique(statisical_test$Protein.ID))
+          temp_id <- as.data.frame(unique(comparative_combined$Protein.ID))
           final_dataframe(located_peptides())
 
         }
@@ -601,15 +629,8 @@ output$confirmKey <-downloadHandler(
 
       shinyjs::enable("downloadPlot")
 
-    },
-
-    error = function(err) {
-      showNotification(
-        paste0(
-          "Check input parameters. Ensure that the cohorts identified are represented in the dataset. Ensure that dataset type is correct for file and if more than one file is being used that comparative is selected."
-        ),
-        type = 'err'
-      )
+    }, error = function(err) {
+      showNotification(print(err), type = 'err')
     }, silent = TRUE)
 
 
@@ -621,12 +642,27 @@ output$confirmKey <-downloadHandler(
   output$downloadPlot <- downloadHandler(
     filename = 'plots.zip',
     content = function(file) {
+      progress <- shiny::Progress$new()
+      progress$set(message = "Preparing Data", value = 0)
+      # Close the progress when this reactive exits (even if there's an error)
+      on.exit(progress$close())
+      updateProgress <- function(value = NULL, detail = NULL) {
+        if (is.null(value)) {
+          value <- progress$getValue()
+          value <- value + (progress$getMax() - value) / length(unique(protein_ids()$Protein.ID))
+        }
+        progress$set(value = value, detail = detail)
+      }
       owd <- setwd(tempdir())
       on.exit(setwd(owd))
       saved <- data.frame(Protein.ID = character())
       plots <- as.list(protein_plotr())
       if (as.integer(svg()) == 0) {
         for (i in unique(protein_ids()$Protein.ID)) {
+          if (is.function(updateProgress)) {
+            text <- "Downloading Plots"
+            updateProgress(detail = text)
+          }
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           if (nrow(plotting_protein()) > 0) {
             filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -655,6 +691,10 @@ output$confirmKey <-downloadHandler(
 
       else{
         for (i in unique(protein_ids()$Protein.ID)) {
+          if (is.function(updateProgress)) {
+            text <- "Downloading Plots"
+            updateProgress(detail = text)
+          }
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           if (nrow(plotting_protein()) > 0) {
             filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -681,6 +721,7 @@ output$confirmKey <-downloadHandler(
         }
       }
 
+
       write.csv(final_dataframe()
                 , file = "final_dataframe.csv"
                 , row.names = F)
@@ -690,10 +731,8 @@ output$confirmKey <-downloadHandler(
                 ,
                 row.names = F)
       write.csv(less_than()
-                ,
-                file = "removed_proteins_less_two.csv"
-                ,
-                row.names = F)
+                , file = "removed_proteins_less_two.csv"
+                , row.names = F)
 
       zip_files <-
         list.files(path = getwd(), pattern = ".svg$|.csv$|.png$")
@@ -703,24 +742,83 @@ output$confirmKey <-downloadHandler(
         dir(path = getwd() , pattern = "*.png$|*.svg$|*.csv$|*.tsv")
       file.remove(file.path(getwd(), files_to_delete))
 
-    }
 
+    }
   )
+
+
+  ###PCA
+  ###
+  ###
+  ###
+  ###
+  observeEvent(input$labelAInput, {
+    name_temp <- input$labelAInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    labelA(unlist(name_temp))
+  })
+
+  observeEvent(input$labelBInput, {
+    name_temp <- input$labelBInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    labelB(unlist(name_temp))
+  })
+
+  observeEvent(input$conditionAInput, {
+    name_temp <- input$conditionAInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    conditionA(unlist(name_temp))
+  })
+
+  observeEvent(input$conditionBInput, {
+    name_temp <- input$conditionBInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    conditionB(unlist(name_temp))
+  })
+
+  observeEvent(input$confirmPCA, {
+    df <- files()[[1]]
+    labelA <- toupper(labelA())
+    labelB <- toupper(labelB())
+    conditionA <- toupper(conditionA())
+    conditionB <- toupper(conditionB())
+
+    output$pcaPlot <- renderUI({
+      renderPlot({
+        runPCA(df, conditionA, conditionB, labelA, labelB)
+      })
+    })
+  })
+
+  observeEvent(input$confirmVol, {
+    df <- files()[[1]]
+    labelA <- toupper(labelA())
+    labelB <- toupper(labelB())
+    conditionA <- (conditionA())
+    conditionB <- (conditionB())
+    genes <- toupper(genes())
+    output$volPlot <- renderUI({
+      renderPlot({
+        runVol(df, conditionA, conditionB, labelA, labelB, genes)
+      })
+    })
+  })
 
 
   #Next and Previous
   #Essentially the same logic between the two of them with the index of
   #the dataframe being incremented by 1 if clicking next or decremented by
-  #1 if previous is clicked. These display the plots from the loop in browser.
+  #1 if previous is clicked. These display the plots from the loop in
+  #.
 
   observeEvent(input$nextPlot, {
     plots <- as.list(protein_plotr())
     uniprot_ids <- as.data.frame(uniprot())
     colnames(uniprot_ids)  <- c("Protein.ID")
     if (nrow(uniprot_ids) > 0) {
-      if (j() < nrow(uniprot_ids)) {
+      if (plot_increment() < nrow(uniprot_ids)) {
         output$plot <- renderUI({
-          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          i <-  unique(uniprot_ids[plot_increment(), 'Protein.ID'])
 
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -737,11 +835,11 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(j() + 1)
+        plot_increment(plot_increment() + 1)
       }
       else {
         output$plot <- renderUI({
-          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          i <-  unique(uniprot_ids[plot_increment(), 'Protein.ID'])
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -756,13 +854,13 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(1)
+        plot_increment(1)
       }
     }
     else{
-      if (j() < nrow(protein_ids())) {
+      if (plot_increment() < nrow(protein_ids())) {
         output$plot <- renderUI({
-          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          i <-  unique(protein_ids()[plot_increment(), 'Protein.ID'])
 
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -779,12 +877,12 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(j() + 1)
+        plot_increment(plot_increment() + 1)
 
       }
       else {
         output$plot <- renderUI({
-          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          i <-  unique(protein_ids()[plot_increment(), 'Protein.ID'])
 
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -800,7 +898,7 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(1)
+        plot_increment(1)
       }
     }
   })
@@ -810,9 +908,9 @@ output$confirmKey <-downloadHandler(
     uniprot_ids <- as.data.frame(uniprot())
     colnames(uniprot_ids)  <- c("Protein.ID")
     if (nrow(uniprot_ids) > 0) {
-      if (j() < nrow(uniprot_ids)  & j() != 1) {
+      if (plot_increment() < nrow(uniprot_ids)  & plot_increment() != 1) {
         output$plot <- renderUI({
-          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          i <-  unique(uniprot_ids[plot_increment(), 'Protein.ID'])
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -828,12 +926,12 @@ output$confirmKey <-downloadHandler(
           })
 
         })
-        j(j() - 1)
+        plot_increment(plot_increment() - 1)
 
       }
       else {
         output$plot <- renderUI({
-          i <-  unique(uniprot_ids[j(), 'Protein.ID'])
+          i <-  unique(uniprot_ids[plot_increment(), 'Protein.ID'])
 
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
@@ -850,14 +948,15 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(1)
+        plot_increment(1)
 
       }
     }
     else{
-      if (j() <= nrow(protein_ids()) & j() != 1) {
+      if (plot_increment() <= nrow(protein_ids()) &
+          plot_increment() != 1) {
         output$plot <- renderUI({
-          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          i <-  unique(protein_ids()[plot_increment(), 'Protein.ID'])
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -872,11 +971,11 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(j() - 1)
+        plot_increment(plot_increment() - 1)
       }
       else {
         output$plot <- renderUI({
-          i <-  unique(protein_ids()[j(), 'Protein.ID'])
+          i <-  unique(protein_ids()[plot_increment(), 'Protein.ID'])
           plotting_protein(filter(located_peptides(), Protein.ID == i))
           filtered_results(filter(located_peptides(), Protein.ID == i))
           filtered_results(inner_join(
@@ -890,7 +989,7 @@ output$confirmKey <-downloadHandler(
             plots[[i]]
           })
         })
-        j(as.integer(nrow(protein_ids())))
+        plot_increment(as.integer(nrow(protein_ids())))
       }
     }
   })
