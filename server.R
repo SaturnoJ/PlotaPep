@@ -778,14 +778,11 @@ server <- function(input, output, session) {
 
   observeEvent(input$confirmPCA, {
     df <- files()[[1]]
-    labelA <- toupper(labelA())
-    labelB <- toupper(labelB())
-    conditionA <- toupper(conditionA())
-    conditionB <- toupper(conditionB())
-
+    label <- lapply(labelA(), toupper)
+    condition <- lapply(conditionA(), toupper)
     output$pcaPlot <- renderUI({
       renderPlot({
-        runPCA(df, conditionA, conditionB, labelA, labelB)
+        runPCA(df, condition, label)
       })
     })
   })

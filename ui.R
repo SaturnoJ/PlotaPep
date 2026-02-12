@@ -46,7 +46,7 @@ ui <- navbarPage(
 #########
 
 #######
-  tabPanel("File Input", (mainPanel(
+  tabPanel("Woods Input", (mainPanel(
     fluidRow(
      shinydashboard::box(
         fileInput(
@@ -310,41 +310,17 @@ ui <- navbarPage(
           buttonLabel = "Browse...",
           placeholder = "No Files Selected"
         ),
-        radioButtons(
-          "file_typeInput",
-          "Select Search Output Type : ",
-          c(
-            "MSFragger No modifications " = 0,
-            "MSFragger Modified/Ion" = 1,
-            "DIA-NN" = 2,
-            "Generic Dataframe" = 3
-          )
-        ),
-        radioButtons(
-          "intensityInput",
-          "Select Intensity : ",
-          c(
-            "Intensity" = 0,
-            "Total" = 1,
-            "Unique" = 2
-          )
-        ),
+
 
 
         textInput("conditionAInput",
-                  "Input A Conditions : ",
+                  "Input Conditions : ",
                   placeholder = "Example CTR, AD, DLB, F_12, etc."),
-        textInput("conditionBInput",
-                  "Input B Condition : ",
 
-                  placeholder = "Example AD, DLB, F_9, etc."),
+
         textInput("labelAInput",
-                  "Input A Label : ",
+                  "Input Labels : ",
                   placeholder = "Example CTR, AD, DLB, F_12, etc."),
-        textInput("labelBInput",
-                  "Input B Label : ",
-
-                  placeholder = "Example AD, DLB, F_9, etc."),
 
 
 
@@ -377,25 +353,25 @@ tabPanel(
           buttonLabel = "Browse...",
           placeholder = "No Files Selected"
         ),
-        radioButtons(
-          "file_typeInput",
-          "Select Search Output Type : ",
-          c(
-            "MSFragger No modifications " = 0,
-            "MSFragger Modified/Ion" = 1,
-            "DIA-NN" = 2,
-            "Generic Dataframe" = 3
-          )
-        ),
-        radioButtons(
-          "intensityInput",
-          "Select Intensity : ",
-          c(
-            "Intensity" = 0,
-            "Total" = 1,
-            "Unique" = 2
-          )
-        ),
+        # radioButtons(
+        #   "file_typeInput",
+        #   "Select Search Output Type : ",
+        #   c(
+        #     "MSFragger No modifications " = 0,
+        #     "MSFragger Modified/Ion" = 1,
+        #     "DIA-NN" = 2,
+        #     "Generic Dataframe" = 3
+        #   )
+        # ),
+        # radioButtons(
+        #   "intensityInput",
+        #   "Select Intensity : ",
+        #   c(
+        #     "Intensity" = 0,
+        #     "Total" = 1,
+        #     "Unique" = 2
+        #   )
+        # ),
 
 
         textInput("conditionAInput",

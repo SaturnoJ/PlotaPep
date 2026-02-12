@@ -627,9 +627,9 @@ locatePeptides <- function(df, updateProgress = NULL) {
 #
 # }
 
-runPCA <- function(df,conditionA, conditionB, labelA, labelB){
+runPCA <- function(df,condition, label){
   df <- df[!is.na(df$Protein.Existence),]
-  all_labels <- c(labelA,labelB)
+  all_labels <- c(label)
 
 
   selected_data <- df %>%
@@ -641,16 +641,73 @@ runPCA <- function(df,conditionA, conditionB, labelA, labelB){
       names_to = "Sample",
       values_to = "Intensity"
     )
-
+if(length(label) == 6){
   long_data <- long_data %>%
     mutate(
       Group = case_when(
 
-        str_detect(Sample, paste(conditionA)) ~ labelA,
-        str_detect(Sample, paste(conditionB)) ~ labelB,
+        str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+        str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+        str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+        str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+        str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+        str_detect(Sample, paste(condition[[6]])) ~ label[[6]],
         TRUE                                        ~ "Other"
       ))
 
+}
+ else if(length(label) == 5){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+          str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+ }
+  else if(length(label) == 4){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+  }
+  else if(length(label) == 3){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+  }
+else{
+  long_data <- long_data %>%
+    mutate(
+      Group = case_when(
+
+        str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+        str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+        TRUE                                        ~ "Other"
+      ))
+}
 
   long_data_log <- long_data %>%
     mutate(log2Intensity = log2(long_data$Intensity)) %>%
@@ -677,15 +734,73 @@ runPCA <- function(df,conditionA, conditionB, labelA, labelB){
   sample_names <- colnames(expr)
 
 
+  if(length(label) == 6){
+    group_map <- tibble(Sample = sample_names) %>%
+      mutate(
+        Group = case_when(
 
-  group_map <- tibble(Sample = sample_names) %>%
-    mutate(
-      Group = case_when(
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+          str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+          str_detect(Sample, paste(condition[[6]])) ~ label[[6]],
+          TRUE                                        ~ "Other"
+        ))
 
-        str_detect(Sample, paste(conditionA)) ~ labelA,
-        str_detect(Sample, paste(conditionB)) ~ labelB,
-        TRUE                                        ~ "Other"
-      ))
+  }
+  else if(length(label) == 5){
+    group_map <- tibble(Sample = sample_names) %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+          str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+  }
+  else if(length(label) == 4){
+    group_map <- tibble(Sample = sample_names) %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+  }
+  else if(length(label) == 3){
+    group_map <- tibble(Sample = sample_names) %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+
+          TRUE                                        ~ "Other"
+        ))
+
+  }
+  else{
+    group_map <- tibble(Sample = sample_names) %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          TRUE                                        ~ "Other"
+        ))
+  }
 
   subset_samples <- group_map %>%
     filter(Group %in% all_labels) %>%
@@ -724,7 +839,7 @@ runPCA <- function(df,conditionA, conditionB, labelA, labelB){
 
   scores <- as.data.frame(pca$x[, 1:2, drop = FALSE])
   scores$Sample <- rownames(scores)
-
+browser()
 
   plot_df <- scores %>%
     left_join(group_map, by = "Sample") %>%
