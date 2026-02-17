@@ -17,7 +17,8 @@ library(magrittr)
 library(shinydisconnect)
 library("colorspace")
 library(ComplexHeatmap)
-
+library(WGCNA)
+library(dendsort)
 
 #Top level function of cleaning data. Determines what file type was inputted and
 #then chooses the proper cleaner based on that. Returns cleaned file.
@@ -729,7 +730,6 @@ else{
     dplyr::select(`Protein.ID`, Gene, Sample, log2Intensity) %>%
     pivot_wider(names_from = Sample, values_from = log2Intensity)
 
-
   expr <- filtered_matrix_4min_wide %>% select(-`Protein.ID`, -Gene)
   sample_names <- colnames(expr)
 
@@ -839,7 +839,7 @@ else{
 
   scores <- as.data.frame(pca$x[, 1:2, drop = FALSE])
   scores$Sample <- rownames(scores)
-browser()
+
 
   plot_df <- scores %>%
     left_join(group_map, by = "Sample") %>%
@@ -1209,6 +1209,173 @@ runVol <- function(df,conditionA, conditionB, labelA, labelB, genes){
 }
 
 
-runCluster <- function(df){
+runWGCNACluster <- function(df,condition,label,title){
+
+#maybe add subgroup for datasets with multiple processed data, i.e. ss vs si
+  df <- df[!is.na(df$Protein.Existence),]
+
+
+  selected_data <- df %>%
+    dplyr::select(2:8, dplyr::contains("MaxLFQ", ignore.case = TRUE))
+
+
+  long_data <- selected_data %>%
+    pivot_longer(
+      cols = contains("MaxLFQ", ignore.case = TRUE),
+      names_to = "Sample",
+      values_to = "Intensity"
+    )
+
+
+  if(length(label) == 6){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+          str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+          str_detect(Sample, paste(condition[[6]])) ~ label[[6]],
+          TRUE                                        ~ "Other"
+        )) %>% dplyr::filter(!(Group %in% c("Other")))
+
+  }
+  else if(length(label) == 5){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+          str_detect(Sample, paste(condition[[5]])) ~ label[[5]],
+
+          TRUE                                        ~ "Other"
+        )) %>% dplyr::filter(!(Group %in% c("Other")))
+
+  }
+  else if(length(label) == 4){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+          str_detect(Sample, paste(condition[[4]])) ~ label[[4]],
+
+          TRUE                                        ~ "Other"
+        )) %>% dplyr::filter(!(Group %in% c("Other")))
+
+  }
+  else if(length(label) == 3){
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          str_detect(Sample, paste(condition[[3]])) ~ label[[3]],
+
+          TRUE                                        ~ "Other"
+        )) %>% dplyr::filter(!(Group %in% c("Other")))
+
+  }
+  else{
+    long_data <- long_data %>%
+      mutate(
+        Group = case_when(
+
+          str_detect(Sample, paste(condition[[1]])) ~ label[[1]],
+          str_detect(Sample, paste(condition[[2]])) ~ label[[2]],
+          TRUE                                        ~ "Other"
+        )) %>% dplyr::filter(!(Group %in% c("Other")))
+  }
+
+  long_data <- long_data[long_data$Intensity != 0,]
+  clinical_and_protein_joined_70prct <- long_data %>%
+    mutate(uniqueSamplesInDF = length(unique(Sample))) %>%
+    group_by(Protein.ID) %>%
+    mutate(countMissingValues = sum(!is.na(Intensity))) %>%
+    mutate(percentageMissing = countMissingValues / uniqueSamplesInDF) %>%
+    filter(percentageMissing > 0.70) %>% # HERE YOU CAN APPLY THE CUT OFF! Here I do 70%
+    dplyr::select(Sample, Group, Protein.ID, Intensity) #clean up by selecting the original columns
+
+
+  WGCNA_data_prepare <- clinical_and_protein_joined_70prct %>%
+    dplyr::select(Sample, Protein.ID, Intensity) %>%
+    spread(key = Protein.ID, value = Intensity) %>%
+    column_to_rownames("Sample") #NOTE, HERE I PUT SAMPLEID as ROWNAME
+
+
+
+  WGCNA_results <- blockwiseModules(
+    datExpr = WGCNA_data_prepare,
+    networkType = "signed",
+    power = 20,
+    minModuleSize = 20,
+    corType = "bicor",
+    maxPOutliers = 0.1,
+    verbose = 3,
+    deepSplit = 4,
+
+    #Standard settings below.
+    reassignThreshold = 1e-6,
+    mergeCutHeight = 0.15,
+    minKMEtoStay = 0.3,
+    minCoreKME = 0.5,
+    TOMType = "unsigned",
+    numericLabels = T,
+    pamRespectsDendro = F
+
+  )
+
+  mergedcolors <- labels2colors(WGCNA_results$colors)
+  module_labels = paste0("mod",WGCNA_results$colors) %>% setNames(names(WGCNA_results$colors))
+  module_color_key = labels2colors(unique(WGCNA_results$colors)) %>% setNames(paste0("mod",unique(WGCNA_results$colors)))
+  mergedcolors <- labels2colors(WGCNA_results$colors)
+
+
+  module_membership = data.frame( feature = colnames(WGCNA_data_prepare), module = module_labels )
+  module_for_plot = module_membership$module
+
+  WGCNA_data_prepare_matrix <- as.matrix(scale(WGCNA_data_prepare))
+
+  #
+
+  WGCNA_clinicalInfo <- clinical_and_protein_joined_70prct %>%
+    spread(key = Protein.ID, value = Intensity) %>% #spread like we do before
+    dplyr::select(Sample, Group)
+  group_color_key = labels2colors(unique(WGCNA_clinicalInfo$Group)) %>% setNames(paste0(unique(WGCNA_clinicalInfo$Group)))
+
+  row_dend = dendsort(hclust(dist(WGCNA_data_prepare_matrix)))
+  col_dend = dendsort(hclust(dist(t(WGCNA_data_prepare_matrix))))
+
+  Heatmap(
+    WGCNA_data_prepare_matrix, #Data that we Z-scored and put in matrix format above.
+    column_split = module_membership$module, #The modules
+    top_annotation = columnAnnotation(
+      modules = module_for_plot,
+      col=list(modules = module_color_key),
+      show_legend = FALSE,
+      show_annotation_name = FALSE),
+    show_column_names = F,
+    show_row_names = F,
+    column_title = title,
+    column_title_gp = gpar(fontsize=10),
+
+    #Define clinical annotations
+    left_annotation = rowAnnotation(
+      Group = WGCNA_clinicalInfo$Group,
+      col = list(Group = group_color_key)
+
+    )
+    ,use_raster = TRUE, raster_by_magick = TRUE,
+  )
+
+
 
 }

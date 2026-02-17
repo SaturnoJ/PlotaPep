@@ -10,18 +10,14 @@ ui <- navbarPage(
   "PlotaPep",
   theme = shinytheme("flatly"),
   useShinyjs(),
-########
-  tabPanel(
-    "Key Input",
-    mainPanel(fluidRow(box(
+  ########
+  tabPanel("Key Input", mainPanel(fluidRow(
+    box(
       fileInput(
         "originalInput",
         "Input output file from database search tools to be renamed : ",
         multiple = FALSE,
-        accept =c("csv",
-                  "comma-separated-values",
-                  ".csv",
-                  ".tsv",".txt"),
+        accept = c("csv", "comma-separated-values", ".csv", ".tsv", ".txt"),
         # close c
         buttonLabel = "Browse...",
         placeholder = "No Original Selected"
@@ -29,8 +25,9 @@ ui <- navbarPage(
 
       downloadButton("confirmKey", "Run Key"),
       DTOutput('tableInput')
-    ))),
-    fluidRow(column(4, wellPanel(
+    )
+  )), fluidRow(column(
+    4, wellPanel(
       p("How to use:"),
       p(
         " 1. Choose file that needs its sample names unobscured. This can be any output file such as report.pr_matrix, combined_peptide, combined_modified, etc."
@@ -38,22 +35,20 @@ ui <- navbarPage(
       p(
         " 2. Put new names into table below. Press CTRL-Enter to save the values."
       ),
-      p(
-        " 3. Run then download"
-      )
-    )))
-  ),
-#########
+      p(" 3. Run then download")
+    )
+  ))),
+  #########
 
-#######
-  tabPanel("Woods Input", (mainPanel(
+  #######
+  tabPanel("Woods Output", (mainPanel(
     fluidRow(
-     shinydashboard::box(
+      shinydashboard::box(
         fileInput(
           "fastaInput",
           "Choose FASTA file : ",
           multiple = FALSE,
-          accept = c(".fasta",".FASTA"),
+          accept = c(".fasta", ".FASTA"),
           buttonLabel = "Browse...",
           placeholder = "No FASTA selected"
         )
@@ -62,10 +57,7 @@ ui <- navbarPage(
           "fileInput",
           "Choose file : ",
           multiple = TRUE,
-          accept = c("csv",
-                     "comma-separated-values",
-                     ".csv",
-                     ".tsv",".txt"),
+          accept = c("csv", "comma-separated-values", ".csv", ".tsv", ".txt"),
           buttonLabel = "Browse...",
           placeholder = "No Files Selected"
         ),
@@ -110,13 +102,8 @@ ui <- navbarPage(
           min = 1,
           max = 100
         ),
-        textInput("ctrInput",
-                  "Input Control Identifier : ",
-                  placeholder = "Example CTR, AD, DLB etc."),
-        textInput("caseInput",
-                  "Input Case Identifiers : ",
-
-                  placeholder = "Example AD, DLB etc."),
+        textInput("ctrInput", "Input Control Identifier : ", placeholder = "Example CTR, AD, DLB etc."),
+        textInput("caseInput", "Input Case Identifiers : ", placeholder = "Example AD, DLB etc."),
         radioButtons(
           "parametricInput",
           "Select Parametric or Nonparametric statistical test : ",
@@ -195,7 +182,8 @@ ui <- navbarPage(
         title = "Amount of control values needed for a protein to be used for statistical test. Min = 2",
         placement = "right",
         trigger = "hover"
-      ),  bsTooltip(
+      ),
+      bsTooltip(
         id = "case_cutoffInput",
         title = "Amount of case values needed for a protein to be used for statistical test. Min = 2",
         placement = "right",
@@ -233,8 +221,7 @@ ui <- navbarPage(
         trigger = "hover"
       )
     )
-  )),
-  fluidRow(column(
+  )), fluidRow(column(
     4, wellPanel(
       p("How to use:"),
       p(
@@ -253,12 +240,12 @@ ui <- navbarPage(
       p(" 6. Use the text input above the plots to search for specific plots.")
     )
   ))),
-############
+  ############
   tabPanel(
     "Plot Output",
 
     mainPanel(fluidRow(
-     shinydashboard::box(
+      shinydashboard::box(
         disabled(
           downloadButton('downloadPlot', "Download Plots and Final Data Table")
         ),
@@ -291,36 +278,24 @@ ui <- navbarPage(
     fluidRow(uiOutput("plot"))
   ),
 
-  tabPanel(
-    "PCA Output",
-
-    mainPanel(
-
+  tabPanel("PCA Output", mainPanel(
     fluidRow(
-     shinydashboard::box(
-
+      shinydashboard::box(
         fileInput(
           "fileInput",
           "Choose file : ",
           multiple = TRUE,
-          accept = c("csv",
-                     "comma-separated-values",
-                     ".csv",
-                     ".tsv",".txt"),
+          accept = c("csv", "comma-separated-values", ".csv", ".tsv", ".txt"),
           buttonLabel = "Browse...",
           placeholder = "No Files Selected"
         ),
 
 
 
-        textInput("conditionAInput",
-                  "Input Conditions : ",
-                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("conditionAInput", "Input Conditions : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
 
 
-        textInput("labelAInput",
-                  "Input Labels : ",
-                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("labelAInput", "Input Labels : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
 
 
 
@@ -330,26 +305,19 @@ ui <- navbarPage(
       ),
 
 
-    fluidRow(uiOutput("pcaPlot"))
-  ))),
+      fluidRow(uiOutput("pcaPlot"))
+    )
+  )),
 
 
-tabPanel(
-  "Volcano Output",
-
-  mainPanel(
-
+  tabPanel("Volcano Output", mainPanel(
     fluidRow(
-     shinydashboard::box(
-
+      shinydashboard::box(
         fileInput(
           "fileInput",
           "Choose file : ",
           multiple = TRUE,
-          accept = c("csv",
-                     "comma-separated-values",
-                     ".csv",
-                     ".tsv",".txt"),
+          accept = c("csv", "comma-separated-values", ".csv", ".tsv", ".txt"),
           buttonLabel = "Browse...",
           placeholder = "No Files Selected"
         ),
@@ -374,20 +342,10 @@ tabPanel(
         # ),
 
 
-        textInput("conditionAInput",
-                  "Input A Conditions : ",
-                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
-        textInput("conditionBInput",
-                  "Input B Condition : ",
-
-                  placeholder = "Example AD, DLB, F_9, etc."),
-        textInput("labelAInput",
-                  "Input A Label : ",
-                  placeholder = "Example CTR, AD, DLB, F_12, etc."),
-        textInput("labelBInput",
-                  "Input B Label : ",
-
-                  placeholder = "Example AD, DLB, F_9, etc."),
+        textInput("conditionAInput", "Input A Conditions : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("conditionBInput", "Input B Condition : ", placeholder = "Example AD, DLB, F_9, etc."),
+        textInput("labelAInput", "Input A Label : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
+        textInput("labelBInput", "Input B Label : ", placeholder = "Example AD, DLB, F_9, etc."),
 
 
 
@@ -398,7 +356,53 @@ tabPanel(
 
 
       fluidRow(uiOutput("volPlot"))
-    )))
+    )
+  )),
+
+  tabPanel("HeatMap Output", mainPanel(
+    fluidRow(
+      shinydashboard::box(
+        fileInput(
+          "fileInput",
+          "Choose file : ",
+          multiple = TRUE,
+          accept = c("csv", "comma-separated-values", ".csv", ".tsv", ".txt"),
+          buttonLabel = "Browse...",
+          placeholder = "No Files Selected"
+        ),
+
+
+
+        textInput("conditionAInput", "Input Conditions : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
+
+
+        textInput("labelAInput", "Input Labels : ", placeholder = "Example CTR, AD, DLB, F_12, etc."),
+
+        textInput("titleInput", "Input Plot Title : ", placeholder = "My Wonderful HeatMap"),
+
+
+        actionButton("confirmHeat", "Run Plotter"),
+
+      ),
+      fluidRow(column(6, wellPanel(
+        p("How to use: (Currently Setup for WGCNA)"),
+        p(
+          " 1. Use renamed file from the Key input tab. This provides a precleaned dataframe which will allow the scripts to function"
+        ),
+        p(
+          " 2. Add conditions and labels to respective text inputs. Conditions will be searching for characters in the sample/filenames of your data and labels will be what is presented on the key of the plot. Labels and Conditions must be ordered the same i.e. A,B and a,b NOT A,B and b,a."
+        ),
+        p(
+          "  For percise labeling please refer to ",  tags$a(href = "https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html", "Regex tutorial") ," website for more info on how to properly use Regex in R."
+        ),
+        p(
+          " 3. Add an optional title and run. Plot will be outputed to page and saveable as a png."
+        ),
+      ))),
+      fluidRow(uiOutput("heatPlot"))
+    )
+  )),
+
 
 
 )

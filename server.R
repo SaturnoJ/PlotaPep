@@ -64,6 +64,7 @@ server <- function(input, output, session) {
   conditionA <- reactiveVal()
   conditionB <- reactiveVal()
   genes <- reactiveVal()
+  title <- reactiveVal()
   #######
 
   #Inputs for each tab on the UI
@@ -746,62 +747,6 @@ server <- function(input, output, session) {
     }
   )
 
-
-  ###PCA
-  ###
-  ###
-  ###
-  ###
-  observeEvent(input$labelAInput, {
-    name_temp <- input$labelAInput
-    name_temp <- strsplit(name_temp, ", |,| , ")
-    labelA(unlist(name_temp))
-  })
-
-  observeEvent(input$labelBInput, {
-    name_temp <- input$labelBInput
-    name_temp <- strsplit(name_temp, ", |,| , ")
-    labelB(unlist(name_temp))
-  })
-
-  observeEvent(input$conditionAInput, {
-    name_temp <- input$conditionAInput
-    name_temp <- strsplit(name_temp, ", |,| , ")
-    conditionA(unlist(name_temp))
-  })
-
-  observeEvent(input$conditionBInput, {
-    name_temp <- input$conditionBInput
-    name_temp <- strsplit(name_temp, ", |,| , ")
-    conditionB(unlist(name_temp))
-  })
-
-  observeEvent(input$confirmPCA, {
-    df <- files()[[1]]
-    label <- lapply(labelA(), toupper)
-    condition <- lapply(conditionA(), toupper)
-    output$pcaPlot <- renderUI({
-      renderPlot({
-        runPCA(df, condition, label)
-      })
-    })
-  })
-
-  observeEvent(input$confirmVol, {
-    df <- files()[[1]]
-    labelA <- toupper(labelA())
-    labelB <- toupper(labelB())
-    conditionA <- (conditionA())
-    conditionB <- (conditionB())
-    genes <- toupper(genes())
-    output$volPlot <- renderUI({
-      renderPlot({
-        runVol(df, conditionA, conditionB, labelA, labelB, genes)
-      })
-    })
-  })
-
-
   #Next and Previous
   #Essentially the same logic between the two of them with the index of
   #the dataframe being incremented by 1 if clicking next or decremented by
@@ -989,6 +934,83 @@ server <- function(input, output, session) {
         plot_increment(as.integer(nrow(protein_ids())))
       }
     }
+  })
+
+
+  #### Labels
+  ####
+  ####
+  observeEvent(input$labelAInput, {
+    name_temp <- input$labelAInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    labelA(unlist(name_temp))
+  })
+
+  observeEvent(input$labelBInput, {
+    name_temp <- input$labelBInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    labelB(unlist(name_temp))
+  })
+
+  observeEvent(input$conditionAInput, {
+    name_temp <- input$conditionAInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    conditionA(unlist(name_temp))
+  })
+
+  observeEvent(input$conditionBInput, {
+    name_temp <- input$conditionBInput
+    name_temp <- strsplit(name_temp, ", |,| , ")
+    conditionB(unlist(name_temp))
+  })
+  observeEvent(input$titleInput, {
+    name_temp <- input$titleInput
+    title(name_temp)
+  })
+
+
+
+  ###PCA
+  ###
+  ###
+  ###
+  ###
+
+  observeEvent(input$confirmPCA, {
+    df <- files()[[1]]
+    label <- lapply(labelA(), toupper)
+    condition <- lapply(conditionA(), toupper)
+    output$pcaPlot <- renderUI({
+      renderPlot({
+        runPCA(df, condition, label)
+      })
+    })
+  })
+######## Volcano
+  observeEvent(input$confirmVol, {
+    df <- files()[[1]]
+    labelA <- toupper(labelA())
+    labelB <- toupper(labelB())
+    conditionA <- (conditionA())
+    conditionB <- (conditionB())
+    genes <- toupper(genes())
+    output$volPlot <- renderUI({
+      renderPlot({
+        runVol(df, conditionA, conditionB, labelA, labelB, genes)
+      })
+    })
+  })
+  ########  Heatmap
+  observeEvent(input$confirmHeat, {
+    df <- files()[[1]]
+    label <- lapply(labelA(), toupper)
+    condition <- lapply(conditionA(), toupper)
+
+    output$heatPlot <- renderUI({
+      renderPlot({
+        runWGCNACluster(df, condition, label,as.character(title()))
+      })
+    })
   })
 
 }
